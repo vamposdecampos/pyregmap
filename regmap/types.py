@@ -71,7 +71,7 @@ class IntBackend(object):
 	def set_bits(self, start, length, value):
 		mask = (1 << length) - 1
 		value &= mask
-		self.value = (self.value & (mask << start)) | (value << start)
+		self.value = (self.value & ~(mask << start)) | (value << start)
 	def get_bits(self, start, length):
 		mask = (1 << length) - 1
 		return (self.value >> start) & mask
