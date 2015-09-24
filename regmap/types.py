@@ -1,14 +1,24 @@
 import unittest
 
 
-class RegisterMap(object):
+class Register(object):
 	pass
 
 
 class RegisterMapTest(unittest.TestCase):
 	def test_layout(self):
-		class TestMap(RegisterMap):
-			pass
+		TestMap = Register("test", defs = [
+			Register("reg1", defs = [
+				Register("field1", 4),
+				Register("field2", 8),
+			]),
+			Register("reg2", defs = [
+				Register("flag0"),
+				Register("flag1"),
+				Register("flag2"),
+				Register("flag3"),
+			]),
+		])
 
 		m = TestMap()
 		self.assertEqual(m.reg1._bit_offset, 0)
