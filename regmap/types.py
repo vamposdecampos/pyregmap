@@ -1,7 +1,6 @@
 import unittest
 import copy
 
-
 class Register(object):
 	def __init__(self, name, bit_length=None, defs=[]):
 		if defs:
@@ -28,8 +27,8 @@ class Register(object):
 
 
 class RegisterMapTest(unittest.TestCase):
-	def test_layout(self):
-		TestMap = Register("test", defs = [
+	def setUp(self):
+		self.TestMap = Register("test", defs = [
 			Register("reg1", defs = [
 				Register("field1", 4),
 				Register("field2", 8),
@@ -42,7 +41,8 @@ class RegisterMapTest(unittest.TestCase):
 			]),
 		])
 
-		m = TestMap()
+	def test_layout(self):
+		m = self.TestMap()
 		self.assertEqual(m.reg1._bit_offset, 0)
 		self.assertEqual(m.reg1._bit_length, 12)
 		self.assertEqual(m.reg2._bit_offset, 12)
@@ -60,6 +60,13 @@ class RegisterMapTest(unittest.TestCase):
 		self.assertEqual(m.reg2.flag1._bit_length, 1)
 		self.assertEqual(m.reg2.flag2._bit_length, 1)
 		self.assertEqual(m.reg2.flag3._bit_length, 1)
+
+	def test_access(self):
+		be = IntBackend()
+		m = self.TestMap(be)
+		m.reg1.field1._set(15)
+		self.assertEqual(be.value, 15)
+
 
 if __name__ == "__main__":
 	unittest.main()
