@@ -1,6 +1,32 @@
 import unittest
 import copy
 
+class Magic(object):
+	"""Magic accessors for a Register
+	
+	For convenience, can be used to replace
+		reg.foo.bar.baz._set(42)
+		print reg.foo.bar.baz._get()
+	with
+		Magic(reg).foo.bar.baz = 42
+		print Magic(reg).foo.bar.baz
+	"""
+	def __init__(self, reg):
+		self._reg = reg
+	def __getattr__(self, attr):
+		sub = getattr(self._reg, attr)
+		if sub._defs:
+			return Magic(sub)
+		else:
+			return sub._get()
+	def __setattr__(self, attr, value):
+		if attr.startswith('_'):
+			self.__dict__[attr] = value
+			return
+		sub = getattr(self._reg, attr)
+		return sub._set(value)
+
+
 class Register(object):
 	def __init__(self, name, bit_length=None, defs=[]):
 		if defs:
