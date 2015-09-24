@@ -54,12 +54,14 @@ class Register(object):
 	def _get(self):
 		return self._backend.get_bits(self._bit_offset, self._bit_length)
 
-	def __call__(self, backend=None):
+	def _magic(self):
+		return Magic(self)
+
+	def __call__(self, backend=None, bit_offset=0, magic=False):
 		"""Instantiate the register map"""
 		res = copy.deepcopy(self)
-		res._set_bit_offset(backend, 0)
-		return res
-
+		res._set_bit_offset(backend, bit_offset)
+		return res._magic() if magic else res
 
 class IntBackend(object):
 	"""A backend backed by a (large) integer."""
@@ -130,7 +132,7 @@ class RegisterMapTest(unittest.TestCase):
 
 	def test_magic(self):
 		be = IntBackend()
-		m = Magic(self.TestMap(be))
+		m = self.TestMap(be, magic=True)
 		self.assertEqual(m.reg1.field1, 0)
 		m.reg2.flag2 = 1
 		self.assertEquals(be.value, 0x4000)
