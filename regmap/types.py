@@ -2,7 +2,17 @@ import unittest
 
 
 class Register(object):
-	pass
+	def __init__(self, name, bit_length=None, defs=[]):
+		self._name = name
+		self._bit_length = bit_length
+		self._defs = defs
+		for reg in self._defs:
+			setattr(self, reg._name, reg)
+
+	def __call__(self, backend=None):
+		"""Instantiate the register map"""
+		# TODO
+		return self
 
 
 class RegisterMapTest(unittest.TestCase):
