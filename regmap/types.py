@@ -101,6 +101,14 @@ class RegisterMapTest(unittest.TestCase):
 		with self.assertRaises(Exception):
 			m.reg1._set(0x1000)
 
+	def test_magic(self):
+		be = IntBackend()
+		m = Magic(self.TestMap(be))
+		self.assertEqual(m.reg1.field1, 0)
+		m.reg2.flag2 = 1
+		self.assertEquals(be.value, 0x4000)
+		self.assertEqual(m.reg2._reg._get(), 4)
+
 
 if __name__ == "__main__":
 	unittest.main()
