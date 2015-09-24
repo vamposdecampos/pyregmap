@@ -96,6 +96,10 @@ class RegisterMapTest(unittest.TestCase):
 		self.assertFalse(m.reg2.flag1._get())
 		self.assertTrue(m.reg2.flag2._get())
 		self.assertFalse(m.reg2.flag3._get())
+		with self.assertRaises(Exception):
+			m.reg1._set(-1)
+		with self.assertRaises(Exception):
+			m.reg1._set(0x1000)
 
 
 if __name__ == "__main__":
