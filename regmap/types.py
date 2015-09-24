@@ -57,7 +57,7 @@ class Register(object):
 	def _magic(self):
 		return Magic(self)
 
-	def __call__(self, backend=None, bit_offset=0, magic=False):
+	def __call__(self, backend=None, bit_offset=0, magic=True):
 		"""Instantiate the register map"""
 		res = copy.deepcopy(self)
 		res._set_bit_offset(backend, bit_offset)
@@ -91,7 +91,7 @@ class RegisterMapTest(unittest.TestCase):
 		])
 
 	def test_layout(self):
-		m = self.TestMap()
+		m = self.TestMap(magic=False)
 		self.assertEqual(m.reg1._bit_offset, 0)
 		self.assertEqual(m.reg1._bit_length, 12)
 		self.assertEqual(m.reg2._bit_offset, 12)
@@ -112,7 +112,7 @@ class RegisterMapTest(unittest.TestCase):
 
 	def test_access(self):
 		be = IntBackend()
-		m = self.TestMap(be)
+		m = self.TestMap(be, magic=False)
 		m.reg1.field1._set(15)
 		self.assertEqual(be.value, 15)
 		self.assertEqual(m.reg1.field1._get(), 15)
@@ -132,7 +132,7 @@ class RegisterMapTest(unittest.TestCase):
 
 	def test_magic(self):
 		be = IntBackend()
-		m = self.TestMap(be, magic=True)
+		m = self.TestMap(be)
 		self.assertEqual(m.reg1.field1, 0)
 		m.reg2.flag2 = 1
 		self.assertEquals(be.value, 0x4000)
