@@ -37,6 +37,7 @@ class Register(object):
 		self._bit_length = bit_length
 		self._defs = defs
 		for reg in self._defs:
+			assert not hasattr(self, reg._name)
 			setattr(self, reg._name, reg)
 
 	def _set_bit_offset(self, backend, bit_offset):
@@ -138,6 +139,16 @@ class RegisterMapTest(unittest.TestCase):
 		self.assertEquals(be.value, 0x4000)
 		self.assertEqual(m.reg2._reg._get(), 4)
 
+	def test_nested(self):
+		be = IntBackend()
+		n = Register("nested", defs = [
+			Register("one", defs=self.TestMap._defs),
+			Register("two", defs=self.TestMap._defs),
+		])(be)
+		self.assertEqual(n.one.reg1.field1, 0)
+		n.one.reg1.field1 = 7
+		self.assertEqual(n.one.reg1.field1, 7)
+		self.assertEqual(n.two.reg1.field1, 0)
 
 if __name__ == "__main__":
 	unittest.main()
