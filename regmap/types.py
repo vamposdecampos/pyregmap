@@ -24,6 +24,8 @@ class Register(object):
 		assert value >= 0
 		assert value < 1 << (self._bit_length)
 		self._backend.set_bits(self._bit_offset, self._bit_length, value)
+	def _get(self):
+		return self._backend.get_bits(self._bit_offset, self._bit_length)
 
 	def __call__(self, backend=None):
 		"""Instantiate the register map"""
@@ -40,6 +42,9 @@ class IntBackend(object):
 		mask = (1 << length) - 1
 		value &= mask
 		self.value = (self.value & (mask << start)) | (value << start)
+	def get_bits(self, start, length):
+		mask = (1 << length) - 1
+		return (self.value >> start) & mask
 
 class RegisterMapTest(unittest.TestCase):
 	def setUp(self):
