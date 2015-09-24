@@ -147,8 +147,10 @@ class RegisterMapTest(unittest.TestCase):
 		])(be)
 		self.assertEqual(n.one.reg1.field1, 0)
 		n.one.reg1.field1 = 7
+		n.two.reg1.field1 = 1
 		self.assertEqual(n.one.reg1.field1, 7)
-		self.assertEqual(n.two.reg1.field1, 0)
+		self.assertEqual(n.two.reg1.field1, 1)
+
 
 if __name__ == "__main__":
 	unittest.main()
