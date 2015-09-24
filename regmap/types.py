@@ -38,18 +38,30 @@ class Register(object):
 			assert not hasattr(self, reg._name)
 			setattr(self, reg._name, reg)
 
-	def _instantiate(self, backend, bit_offset):
-		defs = []
-		offs = bit_offset
-		for reg in self._defs:
-			inst = reg._instantiate(backend, offs)
-			offs += inst._bit_length
-			defs.append(inst)
+	def __call__(self, backend=None, bit_offset=0, magic=True):
+		"""Instantiate the register map"""
+		res = RegisterInstance(self, backend, bit_offset)
+		return res._magic() if magic else res
 
-		res = RegisterInstance(self._name, self._bit_length if not self._defs else None, defs)
-		res._backend = backend
-		res._bit_offset = bit_offset
-		return res
+class RegisterInstance(Register):
+	def __init__(self, reg, backend, bit_offset):
+		self._reg = reg
+		self._backend = backend
+		self._bit_offset = bit_offset
+		self._defs = []
+		for reg in self._reg._defs:
+			inst = RegisterInstance(reg, backend, bit_offset)
+			self._defs.append(inst)
+			assert not hasattr(self, reg._name)
+			setattr(self, reg._name, inst)
+			bit_offset += inst._bit_length
+
+	@property
+	def _bit_length(self):
+		return self._reg._bit_length
+	@property
+	def _name(self):
+		return self._reg._name
 
 	def _set(self, value):
 		max = (1 << self._bit_length) - 1
@@ -58,17 +70,9 @@ class Register(object):
 		self._backend.set_bits(self._bit_offset, self._bit_length, value)
 	def _get(self):
 		return self._backend.get_bits(self._bit_offset, self._bit_length)
-
 	def _magic(self):
 		return Magic(self)
 
-	def __call__(self, backend=None, bit_offset=0, magic=True):
-		"""Instantiate the register map"""
-		res = self._instantiate(backend, bit_offset)
-		return res._magic() if magic else res
-
-class RegisterInstance(Register):
-	pass
 
 class IntBackend(object):
 	"""A backend backed by a (large) integer."""
