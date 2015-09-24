@@ -47,8 +47,9 @@ class Register(object):
 		return self._bit_length
 
 	def _set(self, value):
-		assert value >= 0
-		assert value < 1 << (self._bit_length)
+		max = (1 << self._bit_length) - 1
+		if value < 0 or value > max:
+			raise ValueError('value %r out of 0..%i range' % (value, max))
 		self._backend.set_bits(self._bit_offset, self._bit_length, value)
 	def _get(self):
 		return self._backend.get_bits(self._bit_offset, self._bit_length)
@@ -122,9 +123,9 @@ class RegisterMapTest(unittest.TestCase):
 		self.assertFalse(m.reg2.flag1._get())
 		self.assertTrue(m.reg2.flag2._get())
 		self.assertFalse(m.reg2.flag3._get())
-		with self.assertRaises(Exception):
+		with self.assertRaises(ValueError):
 			m.reg1._set(-1)
-		with self.assertRaises(Exception):
+		with self.assertRaises(ValueError):
 			m.reg1._set(0x1000)
 
 	def test_magic(self):
