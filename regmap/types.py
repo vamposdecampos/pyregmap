@@ -81,6 +81,9 @@ class RegisterMapTest(unittest.TestCase):
 		m = self.TestMap(be)
 		m.reg1.field1._set(15)
 		self.assertEqual(be.value, 15)
+		self.assertEqual(m.reg1.field1._get(), 15)
+		be.value = 0x55aa
+		self.assertEqual(m.reg1.field1._get(), 10)
 
 
 if __name__ == "__main__":
