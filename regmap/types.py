@@ -1,4 +1,5 @@
 import unittest
+import copy
 
 
 class Register(object):
@@ -13,10 +14,17 @@ class Register(object):
 		for reg in self._defs:
 			setattr(self, reg._name, reg)
 
+	def _set_bit_offset(self, bit_offset):
+		self._bit_offset = bit_offset
+		for reg in self._defs:
+			bit_offset += reg._set_bit_offset(bit_offset)
+		return self._bit_length
+
 	def __call__(self, backend=None):
 		"""Instantiate the register map"""
-		# TODO
-		return self
+		res = copy.deepcopy(self)
+		res._set_bit_offset(0)
+		return res
 
 
 class RegisterMapTest(unittest.TestCase):
@@ -44,10 +52,10 @@ class RegisterMapTest(unittest.TestCase):
 		self.assertEqual(m.reg1.field1._bit_length, 4)
 		self.assertEqual(m.reg1.field2._bit_offset, 4)
 		self.assertEqual(m.reg1.field2._bit_length, 8)
-		self.assertEqual(m.reg2.flag0._bit_offset, 8)
-		self.assertEqual(m.reg2.flag1._bit_offset, 9)
-		self.assertEqual(m.reg2.flag2._bit_offset, 10)
-		self.assertEqual(m.reg2.flag3._bit_offset, 11)
+		self.assertEqual(m.reg2.flag0._bit_offset, 12)
+		self.assertEqual(m.reg2.flag1._bit_offset, 13)
+		self.assertEqual(m.reg2.flag2._bit_offset, 14)
+		self.assertEqual(m.reg2.flag3._bit_offset, 15)
 		self.assertEqual(m.reg2.flag0._bit_length, 1)
 		self.assertEqual(m.reg2.flag1._bit_length, 1)
 		self.assertEqual(m.reg2.flag2._bit_length, 1)
