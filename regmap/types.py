@@ -3,6 +3,10 @@ import unittest
 
 class Register(object):
 	def __init__(self, name, bit_length=None, defs=[]):
+		if defs:
+			if bit_length is not None:
+				raise ValueError("cannot have both bit_length and sub-register definitions")
+			bit_length = sum((reg._bit_length for reg in defs))
 		self._name = name
 		self._bit_length = bit_length
 		self._defs = defs
@@ -23,10 +27,10 @@ class RegisterMapTest(unittest.TestCase):
 				Register("field2", 8),
 			]),
 			Register("reg2", defs = [
-				Register("flag0"),
-				Register("flag1"),
-				Register("flag2"),
-				Register("flag3"),
+				Register("flag0", 1),
+				Register("flag1", 1),
+				Register("flag2", 1),
+				Register("flag3", 1),
 			]),
 		])
 
