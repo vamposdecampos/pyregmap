@@ -1,5 +1,4 @@
 import unittest
-import copy
 
 class Magic(object):
 	"""Magic accessors for a Register
@@ -26,7 +25,6 @@ class Magic(object):
 		sub = getattr(self._reg, attr)
 		return sub._set(value)
 
-
 class Register(object):
 	def __init__(self, name, bit_length=None, defs=[]):
 		if defs:
@@ -40,12 +38,18 @@ class Register(object):
 			assert not hasattr(self, reg._name)
 			setattr(self, reg._name, reg)
 
-	def _set_bit_offset(self, backend, bit_offset):
-		self._backend = backend
-		self._bit_offset = bit_offset
+	def _instantiate(self, backend, bit_offset):
+		defs = []
+		offs = bit_offset
 		for reg in self._defs:
-			bit_offset += reg._set_bit_offset(backend, bit_offset)
-		return self._bit_length
+			inst = reg._instantiate(backend, offs)
+			offs += inst._bit_length
+			defs.append(inst)
+
+		res = RegisterInstance(self._name, self._bit_length if not self._defs else None, defs)
+		res._backend = backend
+		res._bit_offset = bit_offset
+		return res
 
 	def _set(self, value):
 		max = (1 << self._bit_length) - 1
@@ -60,9 +64,11 @@ class Register(object):
 
 	def __call__(self, backend=None, bit_offset=0, magic=True):
 		"""Instantiate the register map"""
-		res = copy.deepcopy(self)
-		res._set_bit_offset(backend, bit_offset)
+		res = self._instantiate(backend, bit_offset)
 		return res._magic() if magic else res
+
+class RegisterInstance(Register):
+	pass
 
 class IntBackend(object):
 	"""A backend backed by a (large) integer."""
