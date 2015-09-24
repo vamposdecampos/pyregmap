@@ -13,18 +13,33 @@ class Register(object):
 		for reg in self._defs:
 			setattr(self, reg._name, reg)
 
-	def _set_bit_offset(self, bit_offset):
+	def _set_bit_offset(self, backend, bit_offset):
+		self._backend = backend
 		self._bit_offset = bit_offset
 		for reg in self._defs:
-			bit_offset += reg._set_bit_offset(bit_offset)
+			bit_offset += reg._set_bit_offset(backend, bit_offset)
 		return self._bit_length
+
+	def _set(self, value):
+		assert value >= 0
+		assert value < 1 << (self._bit_length)
+		self._backend.set_bits(self._bit_offset, self._bit_length, value)
 
 	def __call__(self, backend=None):
 		"""Instantiate the register map"""
 		res = copy.deepcopy(self)
-		res._set_bit_offset(0)
+		res._set_bit_offset(backend, 0)
 		return res
 
+
+class IntBackend(object):
+	"""A backend backed by a (large) integer."""
+	def __init__(self, value=0):
+		self.value = value
+	def set_bits(self, start, length, value):
+		mask = (1 << length) - 1
+		value &= mask
+		self.value = (self.value & (mask << start)) | (value << start)
 
 class RegisterMapTest(unittest.TestCase):
 	def setUp(self):
