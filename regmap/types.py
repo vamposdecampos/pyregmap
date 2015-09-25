@@ -30,9 +30,14 @@ class Magic(object):
 class Register(object):
 	def __init__(self, name, bit_length=None, defs=[]):
 		if defs:
+			sub_length = sum((reg._bit_length for reg in defs))
 			if bit_length is not None:
-				raise ValueError("cannot have both bit_length and sub-register definitions")
-			bit_length = sum((reg._bit_length for reg in defs))
+				if bit_length < sub_length:
+					raise ValueError("sum of sub-register lengths %d exceeds bit_length %d" % (sub_length, bit_length))
+				if bit_length > sub_length:
+					defs.append(RegUnused("_unused", bit_length - sub_length))
+			else:
+				bit_length = sub_length
 		self._name = name
 		self._bit_length = bit_length
 		self._defs = defs
@@ -89,6 +94,10 @@ class RegWO(Register):
 	class Instance(RegisterInstance):
 		def _get(self):
 			raise TypeError("write-only register %r" % self._name)
+
+class RegUnused(Register):
+	"""An unused register"""
+	pass
 
 
 
