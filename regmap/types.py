@@ -28,6 +28,7 @@ class Magic(object):
 		return dir(self._reg)
 
 class Register(object):
+	"""A register definition"""
 	def __init__(self, name, bit_length=None, defs=[], rel_bitpos=None):
 		if defs:
 			sub_length = sum((reg._bit_length for reg in defs))
@@ -66,6 +67,7 @@ class Register(object):
 		return res._magic() if magic else res
 
 class RegisterInstance(object):
+	"""An instantiated register.  It has a backend and a well-defined bit position within it."""
 	def __init__(self, reg, backend, bit_offset):
 		self._reg = reg
 		self._backend = backend
