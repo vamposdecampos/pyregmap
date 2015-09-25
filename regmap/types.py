@@ -51,9 +51,10 @@ class Register(object):
 				delta = reg._rel_bitpos - last_rel
 				if delta < 0:
 					raise ValueError("register %r wants relative bit-position in the past (%d)" % (reg._name, delta))
-				padding.append((k, RegUnused(
-					"_unused_%d_%d" % (last_rel, reg._rel_bitpos),
-					delta)))
+				if delta:
+					padding.append((k, RegUnused(
+						"_unused_%d_%d" % (last_rel, reg._rel_bitpos),
+						delta)))
 				last_rel += delta
 			last_rel += reg._bit_length
 		for k, reg in reversed(padding):
@@ -73,7 +74,7 @@ class RegisterInstance(object):
 		for reg in self._reg._defs:
 			inst = reg(backend, bit_offset, magic=False)
 			self._defs.append(inst)
-			assert not hasattr(self, reg._name)
+			assert not hasattr(self, reg._name), "sub-register %r already defined" % reg._name
 			setattr(self, reg._name, inst)
 			bit_offset += inst._bit_length
 
@@ -140,7 +141,7 @@ class RegisterMapTest(unittest.TestCase):
 				Register("flag2", 1),
 				Register("flag3", 1),
 			]),
-			Register("reg32", 16, defs=[
+			Register("reg32", 16, rel_bitpos=8 * 0x32, defs=[
 				RegRO("status0", 1),
 				Register("cmd1", 1, rel_bitpos = 4),
 				RegRO("status1", 1),
@@ -169,9 +170,9 @@ class RegisterMapTest(unittest.TestCase):
 		self.assertEqual(m.reg2.flag1._bit_length, 1)
 		self.assertEqual(m.reg2.flag2._bit_length, 1)
 		self.assertEqual(m.reg2.flag3._bit_length, 1)
-		self.assertEqual(m.reg32.status0._bit_offset, 16)
-		self.assertEqual(m.reg32.status3._bit_offset, 23)
-		self.assertEqual(m.reg32.flag._bit_offset, 30)
+		self.assertEqual(m.reg32.status0._bit_offset, 0x32 * 8)
+		self.assertEqual(m.reg32.status3._bit_offset, 0x32 * 8 + 7)
+		self.assertEqual(m.reg32.flag._bit_offset, 0x32 * 8 + 14)
 
 	def test_access(self):
 		be = IntBackend()
