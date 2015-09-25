@@ -28,7 +28,7 @@ class Magic(object):
 		return dir(self._reg)
 
 class Register(object):
-	def __init__(self, name, bit_length=None, defs=[]):
+	def __init__(self, name, bit_length=None, defs=[], rel_bitpos=None):
 		if defs:
 			sub_length = sum((reg._bit_length for reg in defs))
 			if bit_length is not None:
@@ -41,9 +41,23 @@ class Register(object):
 		self._name = name
 		self._bit_length = bit_length
 		self._defs = defs
-		for reg in self._defs:
+		self._rel_bitpos = rel_bitpos
+		last_rel = 0
+		padding = []
+		for k, reg in enumerate(self._defs):
 			assert not hasattr(self, reg._name)
 			setattr(self, reg._name, reg)
+			if reg._rel_bitpos is not None:
+				delta = reg._rel_bitpos - last_rel
+				if delta < 0:
+					raise ValueError("register %r wants relative bit-position in the past (%d)" % (reg._name, delta))
+				padding.append((k, RegUnused(
+					"_unused_%d_%d" % (last_rel, reg._rel_bitpos),
+					delta)))
+				last_rel += delta
+			last_rel += reg._bit_length
+		for k, reg in reversed(padding):
+			self._defs.insert(k, reg)
 
 	def __call__(self, backend=None, bit_offset=0, magic=True):
 		"""Instantiate the register map"""
@@ -128,11 +142,11 @@ class RegisterMapTest(unittest.TestCase):
 			]),
 			Register("reg32", 16, defs=[
 				RegRO("status0", 1),
-				RegUnused("_unused_1_3", 3),
-				Register("cmd1", 1),
+				Register("cmd1", 1, rel_bitpos = 4),
 				RegRO("status1", 1),
 				RegRO("status2", 1),
 				RegRO("status3", 1),
+				Register("flag", 1, rel_bitpos = 14),
 			]),
 		])
 
@@ -157,6 +171,7 @@ class RegisterMapTest(unittest.TestCase):
 		self.assertEqual(m.reg2.flag3._bit_length, 1)
 		self.assertEqual(m.reg32.status0._bit_offset, 16)
 		self.assertEqual(m.reg32.status3._bit_offset, 23)
+		self.assertEqual(m.reg32.flag._bit_offset, 30)
 
 	def test_access(self):
 		be = IntBackend()
