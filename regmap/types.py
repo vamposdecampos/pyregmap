@@ -24,6 +24,8 @@ class Magic(object):
 			return
 		sub = getattr(self._reg, attr)
 		return sub._set(value)
+	def __dir__(self):
+		return dir(self._reg)
 
 class Register(object):
 	def __init__(self, name, bit_length=None, defs=[]):
