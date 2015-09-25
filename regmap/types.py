@@ -40,17 +40,17 @@ class Register(object):
 
 	def __call__(self, backend=None, bit_offset=0, magic=True):
 		"""Instantiate the register map"""
-		res = RegisterInstance(self, backend, bit_offset)
+		res = self.Instance(self, backend, bit_offset)
 		return res._magic() if magic else res
 
-class RegisterInstance(Register):
+class RegisterInstance(object):
 	def __init__(self, reg, backend, bit_offset):
 		self._reg = reg
 		self._backend = backend
 		self._bit_offset = bit_offset
 		self._defs = []
 		for reg in self._reg._defs:
-			inst = RegisterInstance(reg, backend, bit_offset)
+			inst = reg(backend, bit_offset, magic=False)
 			self._defs.append(inst)
 			assert not hasattr(self, reg._name)
 			setattr(self, reg._name, inst)
@@ -72,6 +72,8 @@ class RegisterInstance(Register):
 		return self._backend.get_bits(self._bit_offset, self._bit_length)
 	def _magic(self):
 		return Magic(self)
+
+Register.Instance = RegisterInstance
 
 
 class IntBackend(object):
