@@ -76,6 +76,20 @@ class RegisterInstance(object):
 Register.Instance = RegisterInstance
 
 
+class RegRO(Register):
+	"""A read-only register"""
+	class Instance(RegisterInstance):
+		def _set(self, value):
+			raise TypeError("read-only register %r" % self._name)
+
+class RegWO(Register):
+	"""A write-only register"""
+	class Instance(RegisterInstance):
+		def _get(self):
+			raise TypeError("write-only register %r" % self._name)
+
+
+
 class IntBackend(object):
 	"""A backend backed by a (large) integer."""
 	def __init__(self, value=0):
