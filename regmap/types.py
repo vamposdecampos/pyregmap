@@ -126,6 +126,14 @@ class RegisterMapTest(unittest.TestCase):
 				Register("flag2", 1),
 				Register("flag3", 1),
 			]),
+			Register("reg32", 16, defs=[
+				RegRO("status0", 1),
+				RegUnused("_unused_1_3", 3),
+				Register("cmd1", 1),
+				RegRO("status1", 1),
+				RegRO("status2", 1),
+				RegRO("status3", 1),
+			]),
 		])
 
 	def test_layout(self):
@@ -134,7 +142,7 @@ class RegisterMapTest(unittest.TestCase):
 		self.assertEqual(m.reg1._bit_length, 12)
 		self.assertEqual(m.reg2._bit_offset, 12)
 		self.assertEqual(m.reg2._bit_length, 4)
-		self.assertEqual(m._bit_length, 16)
+		self.assertEqual(m._bit_length, 32)
 		self.assertEqual(m.reg1.field1._bit_offset, 0)
 		self.assertEqual(m.reg1.field1._bit_length, 4)
 		self.assertEqual(m.reg1.field2._bit_offset, 4)
@@ -147,6 +155,8 @@ class RegisterMapTest(unittest.TestCase):
 		self.assertEqual(m.reg2.flag1._bit_length, 1)
 		self.assertEqual(m.reg2.flag2._bit_length, 1)
 		self.assertEqual(m.reg2.flag3._bit_length, 1)
+		self.assertEqual(m.reg32.status0._bit_offset, 16)
+		self.assertEqual(m.reg32.status3._bit_offset, 23)
 
 	def test_access(self):
 		be = IntBackend()
