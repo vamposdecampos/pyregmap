@@ -169,6 +169,26 @@ class GranularBackend(object):
 		data = self.backend.get_bits(rstart, rlen)
 		return (data >> delta) & mask
 
+class BackendRecorder(object):
+	GET = "get"
+	SET = "set"
+
+	def __init__(self, backend):
+		self.backend = backend
+		self.log = []
+	def pop(self):
+		return self.log.pop(0)
+	def pop_nodata(self):
+		return self.log.pop(0)[:-1]
+	def empty(self):
+		return not len(self.log)
+	def get_bits(self, start, length):
+		data = self.backend.get_bits(start, length)
+		self.log.append((self.GET, start, length, data))
+		return data
+	def set_bits(self, start, length, value):
+		self.log.append((self.SET, start, length, value))
+		return self.backend.set_bits(start, length, value)
 
 class RegisterMapTest(unittest.TestCase):
 	def setUp(self):
@@ -263,6 +283,20 @@ class RegisterMapTest(unittest.TestCase):
 		self.assertEqual(gb.compute_region(31, 1), (0, 32))
 		self.assertEqual(gb.compute_region(31, 2), (0, 64))
 		self.assertEqual(gb.compute_region(32, 1), (32, 64))
+
+	def test_granular_access(self):
+		rec = BackendRecorder(IntBackend())
+		gb = GranularBackend(rec)
+		gb.set_bits(0, 32, 0xdeadbeef)
+		self.assertEqual(rec.pop(), (rec.SET, 0, 32, 0xdeadbeef))
+		self.assertTrue(rec.empty())
+		gb.set_bits(16, 32, 0xcafebabe)
+		self.assertEqual(rec.pop(), (rec.GET, 0, 64, 0xdeadbeef))
+		self.assertEqual(rec.pop(), (rec.SET, 0, 64, 0xcafebabebeef))
+		self.assertTrue(rec.empty())
+		self.assertEqual(gb.get_bits(24, 8), 0xba)
+		self.assertEqual(rec.pop(), (rec.GET, 0, 32, 0xbabebeef))
+		self.assertTrue(rec.empty())
 
 if __name__ == "__main__":
 	unittest.main()
