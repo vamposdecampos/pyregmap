@@ -130,6 +130,46 @@ class IntBackend(object):
 		mask = (1 << length) - 1
 		return (self.value >> start) & mask
 
+class GranularBackend(object):
+	"""A backend which has a (lower) limit on granularity.
+	
+	For example, one cannot write less than 32 bits at a time; as such,
+	writing a single bit may mean a read-modify-write cycle,  or it may
+	be forbidden.
+	"""
+	granularity = 32 # bits
+
+	def __init__(self, backend):
+		self.backend = backend
+	
+	def compute_region(self, start, length):
+		"""Return [start, end) boundaries required for accessing the underlying backend"""
+		real_start = start - (start % self.granularity)
+		real_end = start + length
+		frag = real_end % self.granularity
+		if frag:
+			real_end += self.granularity - frag
+		return (real_start, real_end)
+	def compute_mask(self, start, length):
+		rstart, rend = self.compute_region(start, length)
+		rlen = rend - rstart
+		mask = (1 << length) - 1
+		delta = start - rstart
+		return rstart, rlen, delta, mask
+	def set_bits(self, start, length, value):
+		rstart, rlen, delta, mask = self.compute_mask(start, length)
+		if rstart < start or rlen > length:
+			data = self.backend.get_bits(rstart, rlen)
+		else:
+			data = 0
+		data = data & ~(mask << delta) | (value << delta)
+		self.backend.set_bits(rstart, rlen, data)
+	def get_bits(self, start, length):
+		rstart, rlen, delta, mask = self.compute_mask(start, length)
+		data = self.backend.get_bits(rstart, rlen)
+		return (data >> delta) & mask
+
+
 class RegisterMapTest(unittest.TestCase):
 	def setUp(self):
 		self.TestMap = Register("test", defs = [
@@ -216,6 +256,13 @@ class RegisterMapTest(unittest.TestCase):
 		self.assertEqual(n.one.reg1.field1, 7)
 		self.assertEqual(n.two.reg1.field1, 1)
 
+	def test_granular_region(self):
+		gb = GranularBackend(IntBackend())
+		self.assertEqual(gb.compute_region(0, 32), (0, 32))
+		self.assertEqual(gb.compute_region(5, 1), (0, 32))
+		self.assertEqual(gb.compute_region(31, 1), (0, 32))
+		self.assertEqual(gb.compute_region(31, 2), (0, 64))
+		self.assertEqual(gb.compute_region(32, 1), (32, 64))
 
 if __name__ == "__main__":
 	unittest.main()
