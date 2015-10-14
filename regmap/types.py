@@ -96,6 +96,12 @@ class RegisterInstance(object):
 		return self._backend.get_bits(self._bit_offset, self._bit_length)
 	def _magic(self):
 		return Magic(self)
+	def _getall(self):
+		# TODO: caching, etc.
+		if len(self._defs):
+			return dict((reg._reg._name, reg._getall()) for reg in self._defs)
+		else:
+			return self._get()
 
 Register.Instance = RegisterInstance
 
