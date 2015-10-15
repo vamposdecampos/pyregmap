@@ -123,8 +123,14 @@ class RegUnused(Register):
 	pass
 
 
+class Backend(object):
+	# TODO: @abc.abstractmethod?
+	def set_bits(self, start, length, value):
+		raise NotImplemented()
+	def get_bits(self, start, length):
+		raise NotImplemented()
 
-class IntBackend(object):
+class IntBackend(Backend):
 	"""A backend backed by a (large) integer."""
 	def __init__(self, value=0):
 		self.value = value
@@ -136,7 +142,7 @@ class IntBackend(object):
 		mask = (1 << length) - 1
 		return (self.value >> start) & mask
 
-class GranularBackend(object):
+class GranularBackend(Backend):
 	"""A backend which has a (lower) limit on granularity.
 	
 	For example, one cannot write less than 32 bits at a time; as such,
@@ -175,7 +181,7 @@ class GranularBackend(object):
 		data = self.backend.get_bits(rstart, rlen)
 		return (data >> delta) & mask
 
-class BackendRecorder(object):
+class BackendRecorder(Backend):
 	GET = "get"
 	SET = "set"
 
