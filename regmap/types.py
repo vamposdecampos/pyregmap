@@ -198,6 +198,20 @@ class GranularBackend(Backend):
 		return self.backend.end_update(rstart, rlen)
 
 
+class WindowBackend(Backend):
+	"""A backend wrapper that can translate accesses to a different bit offset."""
+	def __init__(self, backend, offset=0):
+		self.backend = backend
+		self.offset = offset
+	def set_bits(self, start, length, value):
+		return self.backend.set_bits(self.offset + start, length, value)
+	def get_bits(self, start, length):
+		return self.backend.get_bits(self.offset + start, length)
+	def begin_update(self, start, length):
+		return self.backend.begin_update(self.offset + start, length)
+	def end_update(self, start, length):
+		return self.backend.end_update(self.offset + start, length)
+
 class BackendRecorder(Backend):
 	GET = "get"
 	SET = "set"
