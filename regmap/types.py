@@ -212,6 +212,35 @@ class WindowBackend(Backend):
 	def end_update(self, start, length):
 		return self.backend.end_update(self.offset + start, length)
 
+class CachingBackend(Backend):
+	"""A caching wrapper around another backend."""
+
+	def __init__(self, backend):
+		self.backend = backend
+		self.cache = [(None, None, backend)]
+
+	def begin_update(self, start, length):
+		be = WindowBackend(IntBackend(), -start)
+		be.set_bits(start, length, self.backend.get_bits(start, length))
+		self.cache.append((start, length, be))
+	def end_update(self, start, length):
+		assert len(self.cache) > 1
+		cache_start, cache_length, be = self.cache.pop()
+		# 'with' statements must be properly nested, if at all:
+		assert cache_start == start
+		assert cache_length == length
+		self.backend.set_bits(start, length, be.get_bits(start, length))
+		# TODO: may require reloading the next top of cache, or merging
+		assert len(self.cache) == 1, "nested cached 'with' statements not yet supported"
+
+	def set_bits(self, start, length, value):
+		_, _, cache = self.cache[-1]
+		return cache.set_bits(start, length, value)
+	def get_bits(self, start, length):
+		_, _, cache = self.cache[-1]
+		return cache.get_bits(start, length)
+
+
 class BackendRecorder(Backend):
 	GET = "get"
 	SET = "set"
@@ -365,6 +394,23 @@ class RegisterMapTest(unittest.TestCase):
 			self.assertEqual(reg.field2, 5)
 			self.assertEqual(rec.pop(), (rec.GET, 0, 32, 80))
 		self.assertEqual(rec.pop(), (rec.END, 0, 32))
+		self.assertTrue(rec.empty())
+
+	def test_context_manager_cache(self):
+		rec = BackendRecorder(IntBackend())
+		gb = GranularBackend(CachingBackend(rec))
+		m = self.TestMap(gb, magic=False)
+		with m.reg1 as reg:
+			self.assertEqual(rec.pop(), (rec.GET, 0, 32, 0))
+			self.assertEqual(reg.field1, 0)
+			self.assertEqual(reg.field2, 0)
+			reg.field1 = 1
+			self.assertEqual(reg.field1, 1)
+			self.assertEqual(reg.field2, 0)
+			reg.field2 = 5
+			self.assertEqual(reg.field1, 1)
+			self.assertEqual(reg.field2, 5)
+		self.assertEqual(rec.pop(), (rec.SET, 0, 32, 81))
 		self.assertTrue(rec.empty())
 
 if __name__ == "__main__":
