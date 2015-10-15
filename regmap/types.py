@@ -103,6 +103,12 @@ class RegisterInstance(object):
 		else:
 			return self._get()
 
+	def __enter__(self):
+		self._backend.begin_update(self._bit_offset, self._bit_length)
+		return self._magic()
+	def __exit__(self, type, value, traceback):
+		self._backend.end_update(self._bit_offset, self._bit_length)
+
 Register.Instance = RegisterInstance
 
 
@@ -129,6 +135,10 @@ class Backend(object):
 		raise NotImplemented()
 	def get_bits(self, start, length):
 		raise NotImplemented()
+	def begin_update(self, start, length):
+		pass # nop
+	def end_update(self, start, length):
+		pass # nop
 
 class IntBackend(Backend):
 	"""A backend backed by a (large) integer."""
@@ -180,10 +190,19 @@ class GranularBackend(Backend):
 		rstart, rlen, delta, mask = self.compute_mask(start, length)
 		data = self.backend.get_bits(rstart, rlen)
 		return (data >> delta) & mask
+	def begin_update(self, start, length):
+		rstart, rlen, delta, mask = self.compute_mask(start, length)
+		return self.backend.begin_update(rstart, rlen)
+	def end_update(self, start, length):
+		rstart, rlen, delta, mask = self.compute_mask(start, length)
+		return self.backend.end_update(rstart, rlen)
+
 
 class BackendRecorder(Backend):
 	GET = "get"
 	SET = "set"
+	BEGIN = "begin"
+	END = "end"
 
 	def __init__(self, backend):
 		self.backend = backend
@@ -201,6 +220,12 @@ class BackendRecorder(Backend):
 	def set_bits(self, start, length, value):
 		self.log.append((self.SET, start, length, value))
 		return self.backend.set_bits(start, length, value)
+	def begin_update(self, start, length):
+		self.log.append((self.BEGIN, start, length))
+		return self.backend.begin_update(start, length)
+	def end_update(self, start, length):
+		self.log.append((self.END, start, length))
+		return self.backend.begin_update(start, length)
 
 class RegisterMapTest(unittest.TestCase):
 	def setUp(self):
@@ -308,6 +333,24 @@ class RegisterMapTest(unittest.TestCase):
 		self.assertTrue(rec.empty())
 		self.assertEqual(gb.get_bits(24, 8), 0xba)
 		self.assertEqual(rec.pop(), (rec.GET, 0, 32, 0xbabebeef))
+		self.assertTrue(rec.empty())
+
+	def test_context_manager(self):
+		rec = BackendRecorder(IntBackend())
+		gb = GranularBackend(rec)
+		m = self.TestMap(gb, magic=False)
+		with m.reg1 as reg:
+			self.assertEqual(rec.pop(), (rec.BEGIN, 0, 32))
+			self.assertEqual(reg.field1, 0)
+			self.assertEqual(rec.pop(), (rec.GET, 0, 32, 0))
+			self.assertEqual(reg.field2, 0)
+			self.assertEqual(rec.pop(), (rec.GET, 0, 32, 0))
+			reg.field2 = 5
+			self.assertEqual(rec.pop(), (rec.GET, 0, 32, 0))
+			self.assertEqual(rec.pop(), (rec.SET, 0, 32, 80))
+			self.assertEqual(reg.field2, 5)
+			self.assertEqual(rec.pop(), (rec.GET, 0, 32, 80))
+		self.assertEqual(rec.pop(), (rec.END, 0, 32))
 		self.assertTrue(rec.empty())
 
 if __name__ == "__main__":
