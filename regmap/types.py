@@ -131,10 +131,10 @@ class RegisterInstance(object):
 
 
 	def __enter__(self):
-		self._backend.begin_update(self._bit_offset, self._bit_length)
+		self._backend.begin_update(self._bit_offset, self._bit_length, Backend.MODE_RMW)
 		return self._magic()
 	def __exit__(self, type, value, traceback):
-		self._backend.end_update(self._bit_offset, self._bit_length)
+		self._backend.end_update(self._bit_offset, self._bit_length, Backend.MODE_RMW)
 
 Register.Instance = RegisterInstance
 
@@ -157,14 +157,18 @@ class RegUnused(Register):
 
 
 class Backend(object):
+	MODE_RMW	= 'rmw'
+	MODE_READ	= 'read'
+	MODE_WRITE	= 'write'
+
 	# TODO: @abc.abstractmethod?
 	def set_bits(self, start, length, value):
 		raise NotImplemented()
 	def get_bits(self, start, length):
 		raise NotImplemented()
-	def begin_update(self, start, length):
+	def begin_update(self, start, length, mode):
 		pass # nop
-	def end_update(self, start, length):
+	def end_update(self, start, length, mode):
 		pass # nop
 
 class IntBackend(Backend):
@@ -217,12 +221,12 @@ class GranularBackend(Backend):
 		rstart, rlen, delta, mask = self.compute_mask(start, length)
 		data = self.backend.get_bits(rstart, rlen)
 		return (data >> delta) & mask
-	def begin_update(self, start, length):
+	def begin_update(self, start, length, mode):
 		rstart, rlen, delta, mask = self.compute_mask(start, length)
-		return self.backend.begin_update(rstart, rlen)
-	def end_update(self, start, length):
+		return self.backend.begin_update(rstart, rlen, mode)
+	def end_update(self, start, length, mode):
 		rstart, rlen, delta, mask = self.compute_mask(start, length)
-		return self.backend.end_update(rstart, rlen)
+		return self.backend.end_update(rstart, rlen, mode)
 
 
 class WindowBackend(Backend):
@@ -234,9 +238,9 @@ class WindowBackend(Backend):
 		return self.backend.set_bits(self.offset + start, length, value)
 	def get_bits(self, start, length):
 		return self.backend.get_bits(self.offset + start, length)
-	def begin_update(self, start, length):
+	def begin_update(self, start, length, mode):
 		return self.backend.begin_update(self.offset + start, length)
-	def end_update(self, start, length):
+	def end_update(self, start, length, mode):
 		return self.backend.end_update(self.offset + start, length)
 
 class CachingBackend(Backend):
@@ -260,9 +264,9 @@ class CachingBackend(Backend):
 		self.backend = backend
 		self.cache = [backend]
 
-	def begin_update(self, start, length):
+	def begin_update(self, start, length, mode):
 		self.cache.append(self.CachedAccess(self.backend, start, length))
-	def end_update(self, start, length):
+	def end_update(self, start, length, mode):
 		assert len(self.cache) > 1
 		acc = self.cache.pop()
 		# 'with' statements must be properly nested, if at all:
@@ -301,12 +305,12 @@ class BackendRecorder(Backend):
 	def set_bits(self, start, length, value):
 		self.log.append((self.SET, start, length, value))
 		return self.backend.set_bits(start, length, value)
-	def begin_update(self, start, length):
-		self.log.append((self.BEGIN, start, length))
-		return self.backend.begin_update(start, length)
-	def end_update(self, start, length):
-		self.log.append((self.END, start, length))
-		return self.backend.begin_update(start, length)
+	def begin_update(self, start, length, mode):
+		self.log.append((self.BEGIN, start, length, mode))
+		return self.backend.begin_update(start, length, mode)
+	def end_update(self, start, length, mode):
+		self.log.append((self.END, start, length, mode))
+		return self.backend.begin_update(start, length, mode)
 
 class RegisterMapTest(unittest.TestCase):
 	def setUp(self):
@@ -430,7 +434,7 @@ class RegisterMapTest(unittest.TestCase):
 		gb = GranularBackend(rec)
 		m = self.TestMap(gb, magic=False)
 		with m.reg1 as reg:
-			self.assertEqual(rec.pop(), (rec.BEGIN, 0, 32))
+			self.assertEqual(rec.pop(), (rec.BEGIN, 0, 32, Backend.MODE_RMW))
 			self.assertEqual(reg.field1, 0)
 			self.assertEqual(rec.pop(), (rec.GET, 0, 32, 0))
 			self.assertEqual(reg.field2, 0)
@@ -440,7 +444,7 @@ class RegisterMapTest(unittest.TestCase):
 			self.assertEqual(rec.pop(), (rec.SET, 0, 32, 80))
 			self.assertEqual(reg.field2, 5)
 			self.assertEqual(rec.pop(), (rec.GET, 0, 32, 80))
-		self.assertEqual(rec.pop(), (rec.END, 0, 32))
+		self.assertEqual(rec.pop(), (rec.END, 0, 32, Backend.MODE_RMW))
 		self.assertTrue(rec.empty())
 
 	def test_context_manager_cache(self):
