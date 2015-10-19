@@ -270,7 +270,8 @@ class CachingBackend(Backend):
 			self.mode = mode
 			self.real_backend = backend
 			self.backend = WindowBackend(IntBackend(), -start)
-			self.backend.set_bits(start, length, backend.get_bits(start, length))
+			if self.mode != Backend.MODE_WRITE:
+				self.backend.set_bits(start, length, backend.get_bits(start, length))
 			self.written = WindowBackend(IntBackend(), -start)
 		def set_bits(self, start, length, value):
 			if self.mode == Backend.MODE_READ:
@@ -278,6 +279,8 @@ class CachingBackend(Backend):
 			self.written.set_bits(start, length, ((1 << length) - 1) << start)
 			return self.backend.set_bits(start, length, value)
 		def get_bits(self, start, length):
+			if self.mode == Backend.MODE_WRITE:
+				raise ValueError("write-only cache access tried to get bits")
 			return self.backend.get_bits(start, length)
 
 	def __init__(self, backend):
@@ -293,7 +296,12 @@ class CachingBackend(Backend):
 		assert acc.start == start
 		assert acc.length == length
 		assert acc.mode == mode
-		if acc.written.get_bits(start, length):
+		mask = acc.written.get_bits(start, length)
+		full = ((1 << length) - 1) << start
+		if mode == Backend.MODE_WRITE:
+			if mask != full:
+				raise ValueError("write-only cached access did not set all bits (0x%x missing)" % (mask >> start))
+		if mask:
 			assert mode != Backend.MODE_READ # should be caught earlier
 			self.backend.set_bits(start, length, acc.backend.get_bits(start, length))
 		# TODO: may require reloading the next top of cache, or merging
@@ -512,15 +520,24 @@ class RegisterMapTest(unittest.TestCase):
 			self.assertEqual(reg.field2, 5)
 		self.assertTrue(rec.empty())
 
-		with self.assertRaises(ValueError):
-			with read_access(m.reg1) as reg:
+		# attempt to write when read-only
+		with read_access(m.reg1) as reg:
+			with self.assertRaisesRegexp(ValueError, "tried to set"):
 				reg.field1 = 0
 		self.assertEqual(rec.pop(), (rec.GET, 0, 32, 81))
 		self.assertTrue(rec.empty())
 
+		# not all bits set
+		with self.assertRaisesRegexp(ValueError, "did not set all bits"):
+			with write_access(m.reg1) as reg:
+				pass
+		self.assertTrue(rec.empty())
+
+		# non-cached access
 		self.assertEqual(m.reg1.field2._get(), 5)
 		m.reg1.field2._set(1)
 		self.assertEqual(m.reg1.field2._get(), 1)
+
 
 if __name__ == "__main__":
 	unittest.main()
