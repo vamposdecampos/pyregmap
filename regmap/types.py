@@ -514,11 +514,6 @@ class RegisterMapTest(unittest.TestCase):
 			self.assertEqual(reg.field1, 1)
 			self.assertEqual(reg.field2, 5)
 		self.assertTrue(rec.empty())
-		with m.reg1 as reg:
-			self.assertEqual(rec.pop(), (rec.GET, 0, 32, 81))
-			self.assertEqual(reg.field1, 1)
-			self.assertEqual(reg.field2, 5)
-		self.assertTrue(rec.empty())
 
 		# attempt to write when read-only
 		with read_access(m.reg1) as reg:
