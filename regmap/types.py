@@ -10,15 +10,14 @@ class Magic(object):
 		Magic(reg).foo.bar.baz = 42
 		print Magic(reg).foo.bar.baz
 	"""
-	def __init__(self, reg, human=False):
+	def __init__(self, reg):
 		self._reg = reg
-		self._human = human
 	def __getattr__(self, attr):
 		sub = getattr(self._reg, attr)
 		if sub._defs:
-			return Magic(sub, self._human)
+			return Magic(sub)
 		else:
-			return sub._get(self._human)
+			return sub._get()
 	def __setattr__(self, attr, value):
 		if attr.startswith('_'):
 			self.__dict__[attr] = value
@@ -27,6 +26,12 @@ class Magic(object):
 		return sub._set(value)
 	def __dir__(self):
 		return dir(self._reg)
+
+def named_int_factory(reg):
+	return type("enum.%s" % reg._name, (int,), dict(
+		__str__	= lambda self: reg._enum_i2h.get(self, int.__str__(self)),
+		__repr__= lambda self: reg._enum_i2h.get(self, int.__repr__(self)),
+	))
 
 class Register(object):
 	"""A register definition"""
@@ -102,21 +107,21 @@ class RegisterInstance(object):
 		if value < 0 or value > max:
 			raise ValueError('value %r out of 0..%i range' % (value, max))
 		self._backend.set_bits(self._bit_offset, self._bit_length, value)
-	def _get(self, human=False):
+	def _get(self):
 		value = self._backend.get_bits(self._bit_offset, self._bit_length)
-		return self._i2h(value) if human else value
-	def _magic(self, human=False):
-		return Magic(self, human)
-	def _getall(self, human=True):
+		return self._i2h(value)
+	def _magic(self):
+		return Magic(self)
+	def _getall(self):
 		# TODO: caching, etc.
 		if len(self._defs):
-			return dict((reg._reg._name, reg._getall(human)) for reg in self._defs)
+			return dict((reg._reg._name, reg._getall()) for reg in self._defs)
 		else:
-			return self._get(human)
+			return self._get()
 
 	def _i2h(self, value):
 		"""Convert integer to human-readable value (if any)"""
-		return self._reg._enum_i2h.get(value, str(value))
+		return named_int_factory(self._reg)(value)
 	def _h2i(self, value):
 		"""Convert human-readable value to integer; raise ValueError if not possible."""
 		try:
@@ -143,7 +148,7 @@ class RegRO(Register):
 class RegWO(Register):
 	"""A write-only register"""
 	class Instance(RegisterInstance):
-		def _get(self, human=False):
+		def _get(self):
 			raise TypeError("write-only register %r" % self._name)
 
 class RegUnused(Register):
@@ -355,14 +360,13 @@ class RegisterMapTest(unittest.TestCase):
 		self.assertTrue(m.reg2.flag0._get())
 		self.assertFalse(m.reg2.flag1._get())
 		self.assertTrue(m.reg2.flag2._get())
+		self.assertEqual(m.reg2.flag2._get(), 1)
+		self.assertEqual(str(m.reg2.flag2._get()), 'yes')
 		self.assertFalse(m.reg2.flag3._get())
 		with self.assertRaises(ValueError):
 			m.reg1._set(-1)
 		with self.assertRaises(ValueError):
 			m.reg1._set(0x1000)
-		self.assertEqual(m.reg2._getall(), dict(
-			flag0='1', flag1='0', flag2='yes', flag3='0',
-		))
 
 	def test_magic(self):
 		be = IntBackend()
