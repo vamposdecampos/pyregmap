@@ -243,19 +243,19 @@ class CachingBackend(Backend):
 	"""A caching wrapper around another backend."""
 
 	class CachedAccess(object):
-		def __init__(self, start, length, backend):
+		def __init__(self, backend, start, length):
 			self.start = start
 			self.length = length
-			self.backend = backend
+			self.real_backend = backend
+			self.backend = WindowBackend(IntBackend(), -start)
+			self.backend.set_bits(start, length, backend.get_bits(start, length))
 
 	def __init__(self, backend):
 		self.backend = backend
-		self.cache = [self.CachedAccess(None, None, backend)]
+		self.cache = [self]
 
 	def begin_update(self, start, length):
-		be = WindowBackend(IntBackend(), -start)
-		be.set_bits(start, length, self.backend.get_bits(start, length))
-		self.cache.append(self.CachedAccess(start, length, be))
+		self.cache.append(self.CachedAccess(self.backend, start, length))
 	def end_update(self, start, length):
 		assert len(self.cache) > 1
 		acc = self.cache.pop()
