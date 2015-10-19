@@ -29,14 +29,19 @@ class Magic(object):
 
 class Register(object):
 	"""A register definition"""
-	def __init__(self, name, bit_length=None, defs=[], rel_bitpos=None):
+	def __init__(self, name, bit_length=None, defs=[], rel_bitpos=None, enum={}):
 		if defs and (bit_length is not None):
 			sub_length = sum((reg._bit_length for reg in defs))
 			if bit_length < sub_length:
 				raise ValueError("sum of sub-register lengths %d exceeds bit_length %d" % (sub_length, bit_length))
+		if type(enum) != dict:
+			enum = dict(enumerate(enum))
 		self._name = name
 		self._defs = defs
 		self._rel_bitpos = rel_bitpos
+		self._enum_i2h = enum
+		self._enum_h2i = dict(((v, k) for k, v in enum.iteritems()))
+		# TODO: sanity-check that enum values don't overlap
 		last_rel = 0
 		padding = []
 		for k, reg in enumerate(self._defs):
@@ -90,20 +95,34 @@ class RegisterInstance(object):
 		return self._reg._name
 
 	def _set(self, value):
+		if type(value) != int:
+			value = self._h2i(value)
 		max = (1 << self._bit_length) - 1
 		if value < 0 or value > max:
 			raise ValueError('value %r out of 0..%i range' % (value, max))
 		self._backend.set_bits(self._bit_offset, self._bit_length, value)
-	def _get(self):
-		return self._backend.get_bits(self._bit_offset, self._bit_length)
+	def _get(self, human=False):
+		value = self._backend.get_bits(self._bit_offset, self._bit_length)
+		return self._i2h(value) if human else value
 	def _magic(self):
 		return Magic(self)
-	def _getall(self):
+	def _getall(self, human=True):
 		# TODO: caching, etc.
 		if len(self._defs):
-			return dict((reg._reg._name, reg._getall()) for reg in self._defs)
+			return dict((reg._reg._name, reg._getall(human)) for reg in self._defs)
 		else:
-			return self._get()
+			return self._get(human)
+
+	def _i2h(self, value):
+		"""Convert integer to human-readable value (if any)"""
+		return self._reg._enum_i2h.get(value, str(value))
+	def _h2i(self, value):
+		"""Convert human-readable value to integer; raise ValueError if not possible."""
+		try:
+			return self._reg._enum_h2i[value]
+		except KeyError:
+			return int(value) # raises ValueError
+
 
 	def __enter__(self):
 		self._backend.begin_update(self._bit_offset, self._bit_length)
@@ -123,7 +142,7 @@ class RegRO(Register):
 class RegWO(Register):
 	"""A write-only register"""
 	class Instance(RegisterInstance):
-		def _get(self):
+		def _get(self, human=False):
 			raise TypeError("write-only register %r" % self._name)
 
 class RegUnused(Register):
@@ -282,7 +301,7 @@ class RegisterMapTest(unittest.TestCase):
 			Register("reg2", defs = [
 				Register("flag0", 1),
 				Register("flag1", 1),
-				Register("flag2", 1),
+				Register("flag2", 1, enum=("no", "yes")),
 				Register("flag3", 1),
 			]),
 			Register("reg32", 16, rel_bitpos=8 * 0x32, defs=[
@@ -340,6 +359,9 @@ class RegisterMapTest(unittest.TestCase):
 			m.reg1._set(-1)
 		with self.assertRaises(ValueError):
 			m.reg1._set(0x1000)
+		self.assertEqual(m.reg2._getall(), dict(
+			flag0='1', flag1='0', flag2='yes', flag3='0',
+		))
 
 	def test_magic(self):
 		be = IntBackend()
@@ -347,6 +369,10 @@ class RegisterMapTest(unittest.TestCase):
 		self.assertEqual(m.reg1.field1, 0)
 		m.reg2.flag2 = 1
 		self.assertEquals(be.value, 0x4000)
+		self.assertEqual(m.reg2._reg._get(), 4)
+		m.reg2.flag2 = 'no'
+		self.assertEqual(m.reg2._reg._get(), 0)
+		m.reg2.flag2 = 'yes'
 		self.assertEqual(m.reg2._reg._get(), 4)
 
 	def test_nested(self):
