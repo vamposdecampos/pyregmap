@@ -452,6 +452,9 @@ class RegisterMapTest(unittest.TestCase):
 			self.assertEqual(reg.field2, 5)
 		self.assertEqual(rec.pop(), (rec.SET, 0, 32, 81))
 		self.assertTrue(rec.empty())
+		self.assertEqual(m.reg1.field2._get(), 5)
+		m.reg1.field2._set(1)
+		self.assertEqual(m.reg1.field2._get(), 1)
 
 if __name__ == "__main__":
 	unittest.main()
