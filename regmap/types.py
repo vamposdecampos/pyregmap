@@ -30,17 +30,11 @@ class Magic(object):
 class Register(object):
 	"""A register definition"""
 	def __init__(self, name, bit_length=None, defs=[], rel_bitpos=None):
-		if defs:
+		if defs and (bit_length is not None):
 			sub_length = sum((reg._bit_length for reg in defs))
-			if bit_length is not None:
-				if bit_length < sub_length:
-					raise ValueError("sum of sub-register lengths %d exceeds bit_length %d" % (sub_length, bit_length))
-				if bit_length > sub_length:
-					defs.append(RegUnused("_unused", bit_length - sub_length))
-			else:
-				bit_length = sub_length
+			if bit_length < sub_length:
+				raise ValueError("sum of sub-register lengths %d exceeds bit_length %d" % (sub_length, bit_length))
 		self._name = name
-		self._bit_length = bit_length
 		self._defs = defs
 		self._rel_bitpos = rel_bitpos
 		last_rel = 0
@@ -60,6 +54,14 @@ class Register(object):
 			last_rel += reg._bit_length
 		for k, reg in reversed(padding):
 			self._defs.insert(k, reg)
+		if self._defs:
+			if bit_length is None:
+				bit_length = last_rel
+			elif bit_length > last_rel:
+				self._defs.append(RegUnused(
+					"_unused_%d_%d" % (last_rel, bit_length),
+					bit_length - last_rel))
+		self._bit_length = bit_length
 
 	def __call__(self, backend=None, bit_offset=0, magic=True):
 		"""Instantiate the register map"""
@@ -299,7 +301,7 @@ class RegisterMapTest(unittest.TestCase):
 		self.assertEqual(m.reg1._bit_length, 12)
 		self.assertEqual(m.reg2._bit_offset, 12)
 		self.assertEqual(m.reg2._bit_length, 4)
-		self.assertEqual(m._bit_length, 32)
+		self.assertEqual(m._bit_length, 8 * 0x32 + 16)
 		self.assertEqual(m.reg1.field1._bit_offset, 0)
 		self.assertEqual(m.reg1.field1._bit_length, 4)
 		self.assertEqual(m.reg1.field2._bit_offset, 4)
@@ -312,9 +314,12 @@ class RegisterMapTest(unittest.TestCase):
 		self.assertEqual(m.reg2.flag1._bit_length, 1)
 		self.assertEqual(m.reg2.flag2._bit_length, 1)
 		self.assertEqual(m.reg2.flag3._bit_length, 1)
+		self.assertEqual(m.reg32._bit_offset, 0x32 * 8)
 		self.assertEqual(m.reg32.status0._bit_offset, 0x32 * 8)
 		self.assertEqual(m.reg32.status3._bit_offset, 0x32 * 8 + 7)
 		self.assertEqual(m.reg32.flag._bit_offset, 0x32 * 8 + 14)
+		self.assertEqual(sum((x._bit_length for x in m.reg1._defs)), 12)
+		self.assertEqual(sum((x._bit_length for x in m.reg32._defs)), 16)
 
 	def test_access(self):
 		be = IntBackend()
