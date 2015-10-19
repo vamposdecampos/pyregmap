@@ -171,6 +171,23 @@ class Backend(object):
 	def end_update(self, start, length, mode):
 		pass # nop
 
+class rmw_access(object):
+	mode = Backend.MODE_RMW
+	def __init__(self, reg):
+		self.reg = reg
+	def __enter__(self):
+		self.reg._backend.begin_update(self.reg._bit_offset, self.reg._bit_length, self.mode)
+		return self.reg._magic()
+	def __exit__(self, type, value, traceback):
+		self.reg._backend.end_update(self.reg._bit_offset, self.reg._bit_length, self.mode)
+
+class read_access(rmw_access):
+	mode = Backend.MODE_READ
+
+class write_access(rmw_access):
+	mode = Backend.MODE_WRITE
+
+
 class IntBackend(Backend):
 	"""A backend backed by a (large) integer."""
 	def __init__(self, value=0):
@@ -445,6 +462,22 @@ class RegisterMapTest(unittest.TestCase):
 			self.assertEqual(reg.field2, 5)
 			self.assertEqual(rec.pop(), (rec.GET, 0, 32, 80))
 		self.assertEqual(rec.pop(), (rec.END, 0, 32, Backend.MODE_RMW))
+		self.assertTrue(rec.empty())
+
+	def test_context_manager_mode(self):
+		rec = BackendRecorder(IntBackend())
+		m = self.TestMap(rec, magic=False)
+		with rmw_access(m.reg1) as reg:
+			self.assertEqual(rec.pop(), (rec.BEGIN, 0, 12, Backend.MODE_RMW))
+		self.assertEqual(rec.pop(), (rec.END, 0, 12, Backend.MODE_RMW))
+		self.assertTrue(rec.empty())
+		with read_access(m.reg1) as reg:
+			self.assertEqual(rec.pop(), (rec.BEGIN, 0, 12, Backend.MODE_READ))
+		self.assertEqual(rec.pop(), (rec.END, 0, 12, Backend.MODE_READ))
+		self.assertTrue(rec.empty())
+		with write_access(m.reg1) as reg:
+			self.assertEqual(rec.pop(), (rec.BEGIN, 0, 12, Backend.MODE_WRITE))
+		self.assertEqual(rec.pop(), (rec.END, 0, 12, Backend.MODE_WRITE))
 		self.assertTrue(rec.empty())
 
 	def test_context_manager_cache(self):
