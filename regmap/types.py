@@ -249,10 +249,16 @@ class CachingBackend(Backend):
 			self.real_backend = backend
 			self.backend = WindowBackend(IntBackend(), -start)
 			self.backend.set_bits(start, length, backend.get_bits(start, length))
+			self.written = WindowBackend(IntBackend(), -start)
+		def set_bits(self, start, length, value):
+			self.written.set_bits(start, length, ((1 << length) - 1) << start)
+			return self.backend.set_bits(start, length, value)
+		def get_bits(self, start, length):
+			return self.backend.get_bits(start, length)
 
 	def __init__(self, backend):
 		self.backend = backend
-		self.cache = [self]
+		self.cache = [backend]
 
 	def begin_update(self, start, length):
 		self.cache.append(self.CachedAccess(self.backend, start, length))
@@ -262,14 +268,15 @@ class CachingBackend(Backend):
 		# 'with' statements must be properly nested, if at all:
 		assert acc.start == start
 		assert acc.length == length
-		self.backend.set_bits(start, length, acc.backend.get_bits(start, length))
+		if acc.written.get_bits(start, length):
+			self.backend.set_bits(start, length, acc.backend.get_bits(start, length))
 		# TODO: may require reloading the next top of cache, or merging
 		assert len(self.cache) == 1, "nested cached 'with' statements not yet supported"
 
 	def set_bits(self, start, length, value):
-		return self.cache[-1].backend.set_bits(start, length, value)
+		return self.cache[-1].set_bits(start, length, value)
 	def get_bits(self, start, length):
-		return self.cache[-1].backend.get_bits(start, length)
+		return self.cache[-1].get_bits(start, length)
 
 
 class BackendRecorder(Backend):
@@ -452,6 +459,12 @@ class RegisterMapTest(unittest.TestCase):
 			self.assertEqual(reg.field2, 5)
 		self.assertEqual(rec.pop(), (rec.SET, 0, 32, 81))
 		self.assertTrue(rec.empty())
+		with m.reg1 as reg:
+			self.assertEqual(rec.pop(), (rec.GET, 0, 32, 81))
+			self.assertEqual(reg.field1, 1)
+			self.assertEqual(reg.field2, 5)
+		self.assertTrue(rec.empty())
+
 		self.assertEqual(m.reg1.field2._get(), 5)
 		m.reg1.field2._set(1)
 		self.assertEqual(m.reg1.field2._get(), 1)
