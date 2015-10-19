@@ -242,30 +242,34 @@ class WindowBackend(Backend):
 class CachingBackend(Backend):
 	"""A caching wrapper around another backend."""
 
+	class CachedAccess(object):
+		def __init__(self, start, length, backend):
+			self.start = start
+			self.length = length
+			self.backend = backend
+
 	def __init__(self, backend):
 		self.backend = backend
-		self.cache = [(None, None, backend)]
+		self.cache = [self.CachedAccess(None, None, backend)]
 
 	def begin_update(self, start, length):
 		be = WindowBackend(IntBackend(), -start)
 		be.set_bits(start, length, self.backend.get_bits(start, length))
-		self.cache.append((start, length, be))
+		self.cache.append(self.CachedAccess(start, length, be))
 	def end_update(self, start, length):
 		assert len(self.cache) > 1
-		cache_start, cache_length, be = self.cache.pop()
+		acc = self.cache.pop()
 		# 'with' statements must be properly nested, if at all:
-		assert cache_start == start
-		assert cache_length == length
-		self.backend.set_bits(start, length, be.get_bits(start, length))
+		assert acc.start == start
+		assert acc.length == length
+		self.backend.set_bits(start, length, acc.backend.get_bits(start, length))
 		# TODO: may require reloading the next top of cache, or merging
 		assert len(self.cache) == 1, "nested cached 'with' statements not yet supported"
 
 	def set_bits(self, start, length, value):
-		_, _, cache = self.cache[-1]
-		return cache.set_bits(start, length, value)
+		return self.cache[-1].backend.set_bits(start, length, value)
 	def get_bits(self, start, length):
-		_, _, cache = self.cache[-1]
-		return cache.get_bits(start, length)
+		return self.cache[-1].backend.get_bits(start, length)
 
 
 class BackendRecorder(Backend):
