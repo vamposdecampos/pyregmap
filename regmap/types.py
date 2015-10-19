@@ -264,14 +264,17 @@ class CachingBackend(Backend):
 	"""A caching wrapper around another backend."""
 
 	class CachedAccess(object):
-		def __init__(self, backend, start, length):
+		def __init__(self, backend, start, length, mode):
 			self.start = start
 			self.length = length
+			self.mode = mode
 			self.real_backend = backend
 			self.backend = WindowBackend(IntBackend(), -start)
 			self.backend.set_bits(start, length, backend.get_bits(start, length))
 			self.written = WindowBackend(IntBackend(), -start)
 		def set_bits(self, start, length, value):
+			if self.mode == Backend.MODE_READ:
+				raise ValueError("read-only cache access tried to set bits")
 			self.written.set_bits(start, length, ((1 << length) - 1) << start)
 			return self.backend.set_bits(start, length, value)
 		def get_bits(self, start, length):
@@ -282,14 +285,16 @@ class CachingBackend(Backend):
 		self.cache = [backend]
 
 	def begin_update(self, start, length, mode):
-		self.cache.append(self.CachedAccess(self.backend, start, length))
+		self.cache.append(self.CachedAccess(self.backend, start, length, mode))
 	def end_update(self, start, length, mode):
 		assert len(self.cache) > 1
 		acc = self.cache.pop()
 		# 'with' statements must be properly nested, if at all:
 		assert acc.start == start
 		assert acc.length == length
+		assert acc.mode == mode
 		if acc.written.get_bits(start, length):
+			assert mode != Backend.MODE_READ # should be caught earlier
 			self.backend.set_bits(start, length, acc.backend.get_bits(start, length))
 		# TODO: may require reloading the next top of cache, or merging
 		assert len(self.cache) == 1, "nested cached 'with' statements not yet supported"
@@ -500,6 +505,17 @@ class RegisterMapTest(unittest.TestCase):
 			self.assertEqual(rec.pop(), (rec.GET, 0, 32, 81))
 			self.assertEqual(reg.field1, 1)
 			self.assertEqual(reg.field2, 5)
+		self.assertTrue(rec.empty())
+		with m.reg1 as reg:
+			self.assertEqual(rec.pop(), (rec.GET, 0, 32, 81))
+			self.assertEqual(reg.field1, 1)
+			self.assertEqual(reg.field2, 5)
+		self.assertTrue(rec.empty())
+
+		with self.assertRaises(ValueError):
+			with read_access(m.reg1) as reg:
+				reg.field1 = 0
+		self.assertEqual(rec.pop(), (rec.GET, 0, 32, 81))
 		self.assertTrue(rec.empty())
 
 		self.assertEqual(m.reg1.field2._get(), 5)
