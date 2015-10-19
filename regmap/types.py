@@ -10,14 +10,15 @@ class Magic(object):
 		Magic(reg).foo.bar.baz = 42
 		print Magic(reg).foo.bar.baz
 	"""
-	def __init__(self, reg):
+	def __init__(self, reg, human=False):
 		self._reg = reg
+		self._human = human
 	def __getattr__(self, attr):
 		sub = getattr(self._reg, attr)
 		if sub._defs:
-			return Magic(sub)
+			return Magic(sub, self._human)
 		else:
-			return sub._get()
+			return sub._get(self._human)
 	def __setattr__(self, attr, value):
 		if attr.startswith('_'):
 			self.__dict__[attr] = value
@@ -104,8 +105,8 @@ class RegisterInstance(object):
 	def _get(self, human=False):
 		value = self._backend.get_bits(self._bit_offset, self._bit_length)
 		return self._i2h(value) if human else value
-	def _magic(self):
-		return Magic(self)
+	def _magic(self, human=False):
+		return Magic(self, human)
 	def _getall(self, human=True):
 		# TODO: caching, etc.
 		if len(self._defs):
