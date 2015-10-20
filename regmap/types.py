@@ -160,6 +160,7 @@ class Backend(object):
 	MODE_RMW	= 'rmw'
 	MODE_READ	= 'read'
 	MODE_WRITE	= 'write'
+	MODE_DISCARD	= 'discard' # exception raised, skip the writeback
 
 	# TODO: @abc.abstractmethod?
 	def set_bits(self, start, length, value):
@@ -179,7 +180,8 @@ class rmw_access(object):
 		self.reg._backend.begin_update(self.reg._bit_offset, self.reg._bit_length, self.mode)
 		return self.reg._magic()
 	def __exit__(self, type, value, traceback):
-		self.reg._backend.end_update(self.reg._bit_offset, self.reg._bit_length, self.mode)
+		self.reg._backend.end_update(self.reg._bit_offset, self.reg._bit_length,
+			self.mode if traceback is None else Backend.MODE_DISCARD)
 
 class read_access(rmw_access):
 	mode = Backend.MODE_READ
@@ -292,6 +294,8 @@ class CachingBackend(Backend):
 	def end_update(self, start, length, mode):
 		assert len(self.cache) > 1
 		acc = self.cache.pop()
+		if mode == Backend.MODE_DISCARD:
+			return
 		# 'with' statements must be properly nested, if at all:
 		assert acc.start == start
 		assert acc.length == length
