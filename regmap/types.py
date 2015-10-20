@@ -304,7 +304,7 @@ class CachingBackend(Backend):
 		full = (1 << length) - 1
 		if mode == Backend.MODE_WRITE:
 			if mask != full:
-				raise ValueError("write-only cached access did not set all bits (0x%x missing)" % ((full ^ mask) >> start))
+				raise ValueError("write-only cached access did not set all bits (0x%x missing)" % (full ^ mask))
 		if mask:
 			assert mode != Backend.MODE_READ # should be caught earlier
 			self.backend.set_bits(start, length, acc.backend.get_bits(start, length))
