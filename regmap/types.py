@@ -35,6 +35,11 @@ def named_int_factory(reg):
 
 class Register(object):
 	"""A register definition"""
+
+	# if not None, @unused indicates the default value we write
+	# to the register if we've never read it.
+	_unused = None
+
 	def __init__(self, name, bit_length=None, defs=[], rel_bitpos=None, enum={}):
 		if defs and (bit_length is not None):
 			sub_length = sum((reg._bit_length for reg in defs))
@@ -58,7 +63,7 @@ class Register(object):
 				if delta < 0:
 					raise ValueError("register %r wants relative bit-position in the past (%d)" % (reg._name, delta))
 				if delta:
-					padding.append((k, RegUnused(
+					padding.append((k, RegRAZ(
 						"_unused_%d_%d" % (last_rel, reg._rel_bitpos),
 						delta)))
 				last_rel += delta
@@ -69,7 +74,7 @@ class Register(object):
 			if bit_length is None:
 				bit_length = last_rel
 			elif bit_length > last_rel:
-				self._defs.append(RegUnused(
+				self._defs.append(RegRAZ(
 					"_unused_%d_%d" % (last_rel, bit_length),
 					bit_length - last_rel))
 		self._bit_length = bit_length
@@ -129,6 +134,15 @@ class RegisterInstance(object):
 		except KeyError:
 			return int(value) # raises ValueError
 
+	# like _set(), but allow "writing" of read-only fields.  internal only.
+	_preset = _set
+
+	def _preset_reserved(self):
+		"""Write the values of reserved/unused sub-registers to the backend."""
+		if self._reg._unused is not None:
+			self._preset(self._reg._unused)
+		for sub in self._defs:
+			sub._preset_reserved()
 
 	def __enter__(self):
 		self._backend.begin_update(self._bit_offset, self._bit_length, Backend.MODE_RMW)
@@ -141,6 +155,7 @@ Register.Instance = RegisterInstance
 
 class RegRO(Register):
 	"""A read-only register"""
+	_unused = 0
 	class Instance(RegisterInstance):
 		def _set(self, value):
 			raise TypeError("read-only register %r" % self._name)
@@ -151,9 +166,9 @@ class RegWO(Register):
 		def _get(self):
 			raise TypeError("write-only register %r" % self._name)
 
-class RegUnused(Register):
-	"""An unused register"""
-	pass
+class RegRAZ(Register):
+	"""A reserved read-as-zero register."""
+	_unused = 0
 
 
 class Backend(object):
@@ -188,6 +203,10 @@ class read_access(rmw_access):
 
 class write_access(rmw_access):
 	mode = Backend.MODE_WRITE
+	def __enter__(self):
+		res = super(write_access, self).__enter__()
+		self.reg._preset_reserved()
+		return res
 
 
 class IntBackend(Backend):
