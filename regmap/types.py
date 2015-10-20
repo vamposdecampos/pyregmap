@@ -365,7 +365,7 @@ class BackendRecorder(Backend):
 		self.log.append((self.END, start, length, mode))
 		return self.backend.begin_update(start, length, mode)
 
-class RegisterMapTest(unittest.TestCase):
+class BaseTestCase(unittest.TestCase):
 	def setUp(self):
 		self.TestMap = Register("test", defs = [
 			Register("reg1", defs = [
@@ -388,6 +388,7 @@ class RegisterMapTest(unittest.TestCase):
 			]),
 		])
 
+class RegisterMapTest(BaseTestCase):
 	def test_layout(self):
 		m = self.TestMap(magic=False)
 		self.assertEqual(m.reg1._bit_offset, 0)
@@ -482,10 +483,15 @@ class RegisterMapTest(unittest.TestCase):
 		self.assertEqual(rec.pop(), (rec.GET, 0, 32, 0xbabebeef))
 		self.assertTrue(rec.empty())
 
+class ContextManagerTest(BaseTestCase):
+	def setUp(self):
+		super(ContextManagerTest, self).setUp()
+		self.rec = BackendRecorder(IntBackend())
+		self.gb = GranularBackend(self.rec)
+		self.cb = CachingBackend(self.gb)
 	def test_context_manager(self):
-		rec = BackendRecorder(IntBackend())
-		gb = GranularBackend(rec)
-		m = self.TestMap(gb, magic=False)
+		rec = self.rec
+		m = self.TestMap(self.gb, magic=False)
 		with m.reg1 as reg:
 			self.assertEqual(rec.pop(), (rec.BEGIN, 0, 32, Backend.MODE_RMW))
 			self.assertEqual(reg.field1, 0)
@@ -501,7 +507,7 @@ class RegisterMapTest(unittest.TestCase):
 		self.assertTrue(rec.empty())
 
 	def test_context_manager_mode(self):
-		rec = BackendRecorder(IntBackend())
+		rec = self.rec
 		m = self.TestMap(rec, magic=False)
 		with rmw_access(m.reg1) as reg:
 			self.assertEqual(rec.pop(), (rec.BEGIN, 0, 12, Backend.MODE_RMW))
@@ -517,9 +523,8 @@ class RegisterMapTest(unittest.TestCase):
 		self.assertTrue(rec.empty())
 
 	def test_context_manager_cache(self):
-		rec = BackendRecorder(IntBackend())
-		gb = GranularBackend(CachingBackend(rec))
-		m = self.TestMap(gb, magic=False)
+		rec = self.rec
+		m = self.TestMap(self.cb, magic=False)
 		with m.reg1 as reg:
 			self.assertEqual(rec.pop(), (rec.GET, 0, 32, 0))
 			self.assertEqual(reg.field1, 0)
@@ -530,6 +535,8 @@ class RegisterMapTest(unittest.TestCase):
 			reg.field2 = 5
 			self.assertEqual(reg.field1, 1)
 			self.assertEqual(reg.field2, 5)
+			self.assertTrue(rec.empty())
+		self.assertEqual(rec.pop(), (rec.GET, 0, 32, 0))
 		self.assertEqual(rec.pop(), (rec.SET, 0, 32, 81))
 		self.assertTrue(rec.empty())
 		with m.reg1 as reg:
@@ -557,11 +564,9 @@ class RegisterMapTest(unittest.TestCase):
 		self.assertEqual(m.reg1.field2._get(), 1)
 
 	def test_context_mgr_write_only(self):
-		rec = BackendRecorder(IntBackend())
-		gb = GranularBackend(CachingBackend(rec))
-		m = self.TestMap(gb, magic=False)
-
-		gb.granularity = 1
+		rec = self.rec
+		m = self.TestMap(self.cb, magic=False)
+		self.gb.granularity = 1
 		with write_access(m.reg2) as reg:
 			self.assertTrue(rec.empty())
 			reg.flag0 = 1
@@ -572,12 +577,10 @@ class RegisterMapTest(unittest.TestCase):
 		self.assertTrue(rec.empty())
 
 	def test_context_mgr_write_only_sparse(self):
-		rec = BackendRecorder(IntBackend())
-		gb = GranularBackend(rec)
-		cb = CachingBackend(gb)
-		m = self.TestMap(cb, magic=False)
+		rec = self.rec
+		m = self.TestMap(self.cb, magic=False)
 
-		gb.granularity = 16
+		self.gb.granularity = 16
 		with write_access(m.reg32) as reg:
 			self.assertTrue(rec.empty())
 			reg.cmd1 = 1
