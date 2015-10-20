@@ -552,6 +552,19 @@ class RegisterMapTest(unittest.TestCase):
 		self.assertEqual(rec.pop(), (rec.SET, 12, 4, 1 | 4))
 		self.assertTrue(rec.empty())
 
+	def test_context_mgr_write_only_sparse(self):
+		rec = BackendRecorder(IntBackend())
+		gb = GranularBackend(rec)
+		cb = CachingBackend(gb)
+		m = self.TestMap(cb, magic=False)
+
+		gb.granularity = 16
+		with write_access(m.reg32) as reg:
+			self.assertTrue(rec.empty())
+			reg.cmd1 = 1
+			reg.flag = 0
+		self.assertEqual(rec.pop(), (rec.SET, 8 * 0x32, 16, 0x10))
+		self.assertTrue(rec.empty())
 
 if __name__ == "__main__":
 	unittest.main()
