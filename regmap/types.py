@@ -525,6 +525,7 @@ class ContextManagerTest(BaseTestCase):
 	def test_context_manager_cache(self):
 		rec = self.rec
 		m = self.TestMap(self.cb, magic=False)
+		# automagic RMW
 		with m.reg1 as reg:
 			self.assertEqual(rec.pop(), (rec.GET, 0, 32, 0))
 			self.assertEqual(reg.field1, 0)
@@ -539,29 +540,33 @@ class ContextManagerTest(BaseTestCase):
 		self.assertEqual(rec.pop(), (rec.GET, 0, 32, 0))
 		self.assertEqual(rec.pop(), (rec.SET, 0, 32, 81))
 		self.assertTrue(rec.empty())
+		# automagic read-only
 		with m.reg1 as reg:
 			self.assertEqual(rec.pop(), (rec.GET, 0, 32, 81))
 			self.assertEqual(reg.field1, 1)
 			self.assertEqual(reg.field2, 5)
 		self.assertTrue(rec.empty())
-
-		# attempt to write when read-only
-		with read_access(m.reg1) as reg:
-			with self.assertRaisesRegexp(ValueError, "tried to set"):
-				reg.field1 = 0
-		self.assertEqual(rec.pop(), (rec.GET, 0, 32, 81))
-		self.assertTrue(rec.empty())
-
-		# not all bits set
-		with self.assertRaisesRegexp(ValueError, "did not set all bits"):
-			with write_access(m.reg1) as reg:
-				pass
-		self.assertTrue(rec.empty())
-
 		# non-cached access
 		self.assertEqual(m.reg1.field2._get(), 5)
 		m.reg1.field2._set(1)
 		self.assertEqual(m.reg1.field2._get(), 1)
+
+	def test_readonly_write(self):
+		rec = self.rec
+		m = self.TestMap(self.cb, magic=False)
+		with read_access(m.reg1) as reg:
+			with self.assertRaisesRegexp(ValueError, "tried to set"):
+				reg.field1 = 0
+		self.assertEqual(rec.pop(), (rec.GET, 0, 32, 0))
+		self.assertTrue(rec.empty())
+
+	def test_writeonly_incomplete(self):
+		rec = self.rec
+		m = self.TestMap(self.cb, magic=False)
+		with self.assertRaisesRegexp(ValueError, "did not set all bits"):
+			with write_access(m.reg1) as reg:
+				pass
+		self.assertTrue(rec.empty())
 
 	def test_context_mgr_write_only(self):
 		rec = self.rec
