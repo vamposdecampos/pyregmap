@@ -532,6 +532,16 @@ class RegisterMapTest(unittest.TestCase):
 				pass
 		self.assertTrue(rec.empty())
 
+		# non-cached access
+		self.assertEqual(m.reg1.field2._get(), 5)
+		m.reg1.field2._set(1)
+		self.assertEqual(m.reg1.field2._get(), 1)
+
+	def test_context_mgr_write_only(self):
+		rec = BackendRecorder(IntBackend())
+		gb = GranularBackend(CachingBackend(rec))
+		m = self.TestMap(gb, magic=False)
+
 		gb.granularity = 1
 		with write_access(m.reg2) as reg:
 			self.assertTrue(rec.empty())
@@ -541,11 +551,6 @@ class RegisterMapTest(unittest.TestCase):
 			reg.flag3 = 0
 		self.assertEqual(rec.pop(), (rec.SET, 12, 4, 1 | 4))
 		self.assertTrue(rec.empty())
-
-		# non-cached access
-		self.assertEqual(m.reg1.field2._get(), 5)
-		m.reg1.field2._set(1)
-		self.assertEqual(m.reg1.field2._get(), 1)
 
 
 if __name__ == "__main__":
