@@ -276,7 +276,7 @@ class CachingBackend(Backend):
 		def set_bits(self, start, length, value):
 			if self.mode == Backend.MODE_READ:
 				raise ValueError("read-only cache access tried to set bits")
-			self.written.set_bits(start, length, ((1 << length) - 1) << start)
+			self.written.set_bits(start, length, (1 << length) - 1)
 			return self.backend.set_bits(start, length, value)
 		def get_bits(self, start, length):
 			if self.mode == Backend.MODE_WRITE:
@@ -297,7 +297,7 @@ class CachingBackend(Backend):
 		assert acc.length == length
 		assert acc.mode == mode
 		mask = acc.written.get_bits(start, length)
-		full = ((1 << length) - 1) << start
+		full = (1 << length) - 1
 		if mode == Backend.MODE_WRITE:
 			if mask != full:
 				raise ValueError("write-only cached access did not set all bits (0x%x missing)" % ((full ^ mask) >> start))
@@ -535,7 +535,7 @@ class RegisterMapTest(unittest.TestCase):
 			reg.flag1 = 0
 			reg.flag2 = 'yes'
 			reg.flag3 = 0
-		self.assertEqual(rec.pop(), (rec.SET, 12, 4, 1 | 3))
+		self.assertEqual(rec.pop(), (rec.SET, 12, 4, 1 | 4))
 		self.assertTrue(rec.empty())
 
 		# non-cached access
