@@ -79,24 +79,31 @@ class Register(object):
 					bit_length - last_rel))
 		self._bit_length = bit_length
 
-	def __call__(self, backend=None, bit_offset=0, magic=True):
+	def __call__(self, backend=None, bit_offset=0, magic=True, parent=None):
 		"""Instantiate the register map"""
-		res = self.Instance(self, backend, bit_offset)
+		res = self.Instance(self, backend, bit_offset, parent)
 		return res._magic() if magic else res
 
 class RegisterInstance(object):
 	"""An instantiated register.  It has a backend and a well-defined bit position within it."""
-	def __init__(self, reg, backend, bit_offset):
+	def __init__(self, reg, backend, bit_offset, parent):
 		self._reg = reg
 		self._backend = backend
 		self._bit_offset = bit_offset
 		self._defs = []
+		self._parent = parent
+		if parent:
+			self._long_name = '%s.%s' % (self._parent._name, self._name)
+		else:
+			self._long_name = self._name
 		for reg in self._reg._defs:
-			inst = reg(backend, bit_offset, magic=False)
+			inst = reg(backend, bit_offset, magic=False, parent=self)
 			self._defs.append(inst)
 			assert not hasattr(self, reg._name), "sub-register %r already defined" % reg._name
 			setattr(self, reg._name, inst)
 			bit_offset += inst._bit_length
+	def __repr__(self):
+		return "<%s %s>" % (self._reg.__class__.__name__, self._long_name)
 
 	@property
 	def _bit_length(self):
