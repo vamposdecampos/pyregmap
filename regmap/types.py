@@ -144,14 +144,28 @@ class RegisterInstance(object):
 		for sub in self._defs:
 			sub._preset_reserved()
 
-	def _find_reg(self, bit_offset):
+	def _visit_regs(self, test_func):
+		"""Recursively visit all sub-registers and call test_func(reg) on them.
+		
+		Return an iterator consisting of all such registers where the function
+		returned True"""
+		if not len(self._defs):
+			if test_func(self):
+				yield self
+			return
 		for sub in self._defs:
-			res = sub._find_reg(bit_offset)
-			if res:
-				return res
-		if self._bit_offset <= bit_offset < (self._bit_offset + self._bit_length):
-			return self
-		return None
+			for res in sub._visit_regs(test_func):
+				yield res
+	def _find_regs(self, bit_offset, bit_length):
+		"""Return all registers that fit in the specified bit interval."""
+		return self._visit_regs(lambda r: not (\
+				(bit_offset + bit_length <= r._bit_offset) or \
+				(bit_offset >= r._bit_offset + r._bit_length)))
+	def _find_reg(self, bit_offset):
+		for reg in self._visit_regs(lambda r: \
+				r._bit_offset <= bit_offset < (r._bit_offset + r._bit_length)):
+			return reg
+
 
 	def __enter__(self):
 		self._backend.begin_update(self._bit_offset, self._bit_length, Backend.MODE_RMW)
@@ -427,6 +441,8 @@ class RegisterMapTest(BaseTestCase):
 	def test_reverse_lookup(self):
 		m = self.TestMap(magic=False)
 		self.assertEqual(m._find_reg(15), m.reg2.flag3)
+		self.assertEqual(set(m._find_regs(15, 1)), set([m.reg2.flag3]))
+		self.assertEqual(set(m._find_regs(14, 2)), set([m.reg2.flag2, m.reg2.flag3]))
 
 	def test_access(self):
 		be = IntBackend()
