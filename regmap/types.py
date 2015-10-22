@@ -93,7 +93,7 @@ class RegisterInstance(object):
 		self._defs = []
 		self._parent = parent
 		if parent:
-			self._long_name = '%s.%s' % (self._parent._name, self._name)
+			self._long_name = '%s.%s' % (self._parent._long_name, self._name)
 		else:
 			self._long_name = self._name
 		for reg in self._reg._defs:
@@ -450,6 +450,10 @@ class RegisterMapTest(BaseTestCase):
 		self.assertEqual(m._find_reg(15), m.reg2.flag3)
 		self.assertEqual(set(m._find_regs(15, 1)), set([m.reg2.flag3]))
 		self.assertEqual(set(m._find_regs(14, 2)), set([m.reg2.flag2, m.reg2.flag3]))
+
+	def test_cosmetic(self):
+		m = self.TestMap(magic=False)
+		self.assertEqual(repr(m.reg2.flag3), '<Register test.reg2.flag3>')
 
 	def test_access(self):
 		be = IntBackend()
