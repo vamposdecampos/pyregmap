@@ -195,6 +195,8 @@ class RegWO(Register):
 	class Instance(RegisterInstance):
 		def _get(self):
 			raise TypeError("write-only register %r" % self._name)
+		def _getall(self):
+			return None
 
 class RegRAZ(Register):
 	"""A reserved read-as-zero register."""
