@@ -144,6 +144,15 @@ class RegisterInstance(object):
 		for sub in self._defs:
 			sub._preset_reserved()
 
+	def _find_reg(self, bit_offset):
+		for sub in self._defs:
+			res = sub._find_reg(bit_offset)
+			if res:
+				return res
+		if self._bit_offset <= bit_offset < (self._bit_offset + self._bit_length):
+			return self
+		return None
+
 	def __enter__(self):
 		self._backend.begin_update(self._bit_offset, self._bit_length, Backend.MODE_RMW)
 		return self._magic()
@@ -415,6 +424,10 @@ class RegisterMapTest(BaseTestCase):
 		self.assertEqual(sum((x._bit_length for x in m.reg1._defs)), 12)
 		self.assertEqual(sum((x._bit_length for x in m.reg32._defs)), 16)
 
+	def test_reverse_lookup(self):
+		m = self.TestMap(magic=False)
+		self.assertEqual(m._find_reg(15), m.reg2.flag3)
+
 	def test_access(self):
 		be = IntBackend()
 		m = self.TestMap(be, magic=False)
@@ -584,7 +597,6 @@ class ContextManagerTest(BaseTestCase):
 	def test_context_mgr_write_only_sparse(self):
 		rec = self.rec
 		m = self.TestMap(self.cb, magic=False)
-
 		self.gb.granularity = 16
 		with write_access(m.reg32) as reg:
 			self.assertTrue(rec.empty())
