@@ -410,7 +410,7 @@ class BaseTestCase(unittest.TestCase):
 			]),
 			Register("reg32", 16, rel_bitpos=8 * 0x32, defs=[
 				RegRO("status0", 1),
-				Register("cmd1", 1, rel_bitpos = 4),
+				RegWO("cmd1", 1, rel_bitpos = 4),
 				RegRO("status1", 1),
 				RegRO("status2", 1),
 				RegRO("status3", 1),
@@ -500,6 +500,20 @@ class RegisterMapTest(BaseTestCase):
 		n.two.reg1.field1 = 1
 		self.assertEqual(n.one.reg1.field1, 7)
 		self.assertEqual(n.two.reg1.field1, 1)
+
+	def test_getall(self):
+		m = self.TestMap(IntBackend(), magic=False)
+		self.assertEqual(m.reg32._getall(), {
+			'_unused_15_16': 0,
+			'_unused_1_4': 0,
+			'_unused_8_14': 0,
+			'cmd1': None,
+			'flag': 0,
+			'status0': 0,
+			'status1': 0,
+			'status2': 0,
+			'status3': 0,
+		})
 
 	def test_granular_region(self):
 		gb = GranularBackend(IntBackend())
