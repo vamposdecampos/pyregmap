@@ -68,7 +68,7 @@ class Register(object):
 	# to the register if we've never read it.
 	_unused = None
 
-	def __init__(self, name, bit_length=None, defs=[], rel_bitpos=None, enum={}):
+	def __init__(self, name, bit_length=None, defs=[], rel_bitpos=None, enum={}, doc=None):
 		defs = list(Modifier.modify_defs(defs))
 		if defs and (bit_length is not None):
 			sub_length = sum((reg._bit_length for reg in defs))
@@ -78,6 +78,7 @@ class Register(object):
 			enum = dict(enumerate(enum))
 		self._name = name
 		self._defs = defs
+		self._doc = doc
 		self._rel_bitpos = rel_bitpos
 		self._enum_i2h = enum
 		self._enum_h2i = dict(((v, k) for k, v in enum.iteritems()))
