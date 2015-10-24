@@ -33,6 +33,36 @@ def named_int_factory(reg):
 		__repr__= lambda self: reg._enum_i2h.get(self, int.__repr__(self)),
 	))
 
+class Modifier(object):
+	"""An meta-register that acts upon other registers in a definition list"""
+	@staticmethod
+	def modify_defs(lst):
+		mod = None
+		for item in lst:
+			if isinstance(item, Modifier):
+				mod = item
+				continue
+			if mod is not None:
+				mod, item = mod.modify(item)
+			if item is not None:
+				yield item
+	def modify(self, item):
+		raise NotImplemented
+
+class AtBit(Modifier):
+	"""Make the next Register start at the given rel_bitpos"""
+	def __init__(self, bit):
+		self.bit = bit
+	def modify(self, reg):
+		reg._rel_bitpos = self.bit
+		return None, reg
+
+class AtByte(AtBit):
+	"""Make the next Register start at a rel_bitpos, given in bytes"""
+	def __init__(self, byte):
+		super(AtByte, self).__init__(8 * byte)
+
+
 class Register(object):
 	"""A register definition"""
 
@@ -41,6 +71,7 @@ class Register(object):
 	_unused = None
 
 	def __init__(self, name, bit_length=None, defs=[], rel_bitpos=None, enum={}):
+		defs = list(Modifier.modify_defs(defs))
 		if defs and (bit_length is not None):
 			sub_length = sum((reg._bit_length for reg in defs))
 			if bit_length < sub_length:
@@ -420,7 +451,33 @@ class BaseTestCase(unittest.TestCase):
 			]),
 		])
 
-class RegisterMapTest(BaseTestCase):
+class SparseTestCase(unittest.TestCase):
+	def setUp(self):
+		self.TestMap = Register("test", defs = [
+			Register("reg1", defs = [
+				Register("field1", 4),
+				Register("field2", 8),
+			]),
+			Register("reg2", defs = [
+				Register("flag0", 1),
+				Register("flag1", 1),
+				Register("flag2", 1, enum=("no", "yes")),
+				Register("flag3", 1),
+			]),
+			AtByte(0x32),
+			Register("reg32", 16, defs=[
+				RegRO("status0", 1),
+				AtBit(4),
+				RegWO("cmd1", 1),
+				RegRO("status1", 1),
+				RegRO("status2", 1),
+				RegRO("status3", 1),
+				AtBit(14),
+				Register("flag", 1),
+			]),
+		])
+
+class LayoutTestCase(object):
 	def test_layout(self):
 		m = self.TestMap(magic=False)
 		self.assertEqual(m.reg1._bit_offset, 0)
@@ -447,6 +504,13 @@ class RegisterMapTest(BaseTestCase):
 		self.assertEqual(sum((x._bit_length for x in m.reg1._defs)), 12)
 		self.assertEqual(sum((x._bit_length for x in m.reg32._defs)), 16)
 
+class ClassicLayoutTestCase(BaseTestCase, LayoutTestCase):
+	pass
+
+class SparseLayoutTestCase(SparseTestCase, LayoutTestCase):
+	pass
+
+class RegisterMapTest(BaseTestCase):
 	def test_reverse_lookup(self):
 		m = self.TestMap(magic=False)
 		self.assertEqual(m._find_reg(15), m.reg2.flag3)
