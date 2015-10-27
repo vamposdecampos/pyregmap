@@ -177,6 +177,13 @@ class RegisterMapTest(BaseTestCase):
 		self.assertEqual(rec.pop(), (rec.GET, 0, 32, 0xbabebeef))
 		self.assertTrue(rec.empty())
 
+	def test_int_bits(self):
+		m = Register("test", defs = [
+			Register("reg128", 128),
+		])(IntBackend(), magic=False)
+		m.reg128._set(0xec000002 << 64)
+		self.assertEqual(m.reg128._get(), 0xec000002 << 64)
+
 class ContextManagerTest(BaseTestCase):
 	def setUp(self):
 		super(ContextManagerTest, self).setUp()

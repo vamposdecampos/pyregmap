@@ -1,3 +1,5 @@
+import sys
+
 class Magic(object):
 	"""Magic accessors for a Register
 	
@@ -25,10 +27,10 @@ class Magic(object):
 	def __dir__(self):
 		return dir(self._reg)
 
-def named_int_factory(reg):
-	return type("enum.%s" % reg._name, (int,), dict(
-		__str__	= lambda self: reg._enum_i2h.get(self, int.__str__(self)),
-		__repr__= lambda self: reg._enum_i2h.get(self, int.__repr__(self)),
+def named_int_factory(reg, base=int):
+	return type("enum.%s" % reg._name, (base,), dict(
+		__str__	= lambda self: reg._enum_i2h.get(self, base.__str__(self)),
+		__repr__= lambda self: reg._enum_i2h.get(self, base.__repr__(self)),
 	))
 
 class Modifier(object):
@@ -163,7 +165,7 @@ class RegisterInstance(object):
 
 	def _i2h(self, value):
 		"""Convert integer to human-readable value (if any)"""
-		return named_int_factory(self._reg)(value)
+		return named_int_factory(self._reg, int if value < sys.maxint else long)(value)
 	def _h2i(self, value):
 		"""Convert human-readable value to integer; raise ValueError if not possible."""
 		try:
