@@ -36,7 +36,6 @@ class MmapBackend(object):
 		if sys.byteorder != 'little':
 			bytes = reversed(bytes)
 		self.mm[bstart:bend] = str(bytearray(bytes))
-		self.mm.flush()
 	def get_bits(self, start, length):
 		assert start % 8 == 0
 		assert length % 8 == 0
