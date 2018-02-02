@@ -119,7 +119,7 @@ class RegisterMapTest(BaseTestCase):
 
 	def test_magic(self):
 		be = IntBackend()
-		m = self.TestMap(be)
+		m = self.TestMap(be, magic=True)
 		self.assertEqual(m.reg1.field1, 0)
 		m.reg2.flag2 = 1
 		self.assertEquals(be.value, 0x4000)
@@ -154,7 +154,7 @@ class RegisterMapTest(BaseTestCase):
 		n = Register("nested", defs = [
 			Register("one", defs=self.TestMap._defs),
 			Register("two", defs=self.TestMap._defs),
-		])(be)
+		])(be, magic=True)
 		self.assertEqual(n.one.reg1.field1, 0)
 		n.one.reg1.field1 = 7
 		n.two.reg1.field1 = 1
