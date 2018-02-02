@@ -115,7 +115,7 @@ class Register(object):
 					bit_length - last_rel))
 		self._bit_length = bit_length
 
-	def __call__(self, backend=None, bit_offset=0, parent=None, magic=True, automagic=None):
+	def __call__(self, backend=None, bit_offset=0, parent=None, magic=False, automagic=None):
 		"""Instantiate the register map"""
 		if automagic is None:
 			automagic = magic
