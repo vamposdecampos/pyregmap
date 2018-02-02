@@ -140,6 +140,14 @@ class RegisterMapTest(BaseTestCase):
 		self.assertEqual(m.reg2(), 0)
 		m.reg2.flag2('yes')
 		self.assertEqual(m.reg2(), 4)
+		with m.reg2 as r:
+			self.assertEqual(r.flag2(), 1)
+		with read_access(m.reg2) as r:
+			self.assertEqual(r.flag2(), 1)
+		with rmw_access(m.reg2) as r:
+			self.assertEqual(r.flag2(), 1)
+		with write_access(m.reg2) as r:
+			self.assertEqual(r.flag2(), 1)
 
 	def test_nested(self):
 		be = IntBackend()
@@ -204,7 +212,7 @@ class ContextManagerTest(BaseTestCase):
 		self.cb = CachingBackend(self.gb)
 	def test_context_manager(self):
 		rec = self.rec
-		m = self.TestMap(self.gb, magic=False)
+		m = self.TestMap(self.gb, magic=True)
 		with m.reg1 as reg:
 			self.assertEqual(rec.pop(), (rec.BEGIN, 0, 32, Backend.MODE_RMW))
 			self.assertEqual(reg.field1, 0)
@@ -221,7 +229,7 @@ class ContextManagerTest(BaseTestCase):
 
 	def test_context_manager_mode(self):
 		rec = self.rec
-		m = self.TestMap(rec, magic=False)
+		m = self.TestMap(rec, magic=True)
 		with rmw_access(m.reg1) as reg:
 			self.assertEqual(rec.pop(), (rec.BEGIN, 0, 12, Backend.MODE_RMW))
 		self.assertEqual(rec.pop(), (rec.END, 0, 12, Backend.MODE_RMW))
@@ -237,7 +245,7 @@ class ContextManagerTest(BaseTestCase):
 
 	def test_context_manager_cache(self):
 		rec = self.rec
-		m = self.TestMap(self.cb, magic=False)
+		m = self.TestMap(self.cb, magic=True)
 		# automagic RMW
 		with m.reg1 as reg:
 			self.assertEqual(rec.pop(), (rec.GET, 0, 32, 0))
@@ -260,13 +268,13 @@ class ContextManagerTest(BaseTestCase):
 			self.assertEqual(reg.field2, 5)
 		self.assertTrue(rec.empty())
 		# non-cached access
-		self.assertEqual(m.reg1.field2._get(), 5)
-		m.reg1.field2._set(1)
-		self.assertEqual(m.reg1.field2._get(), 1)
+		self.assertEqual(m.reg1.field2, 5)
+		m.reg1.field2 = 1
+		self.assertEqual(m.reg1.field2, 1)
 
 	def test_readonly_write(self):
 		rec = self.rec
-		m = self.TestMap(self.cb, magic=False)
+		m = self.TestMap(self.cb, magic=True)
 		with read_access(m.reg1) as reg:
 			with self.assertRaisesRegexp(ValueError, "tried to set"):
 				reg.field1 = 0
@@ -283,7 +291,7 @@ class ContextManagerTest(BaseTestCase):
 
 	def test_context_mgr_write_only(self):
 		rec = self.rec
-		m = self.TestMap(self.cb, magic=False)
+		m = self.TestMap(self.cb, magic=True)
 		self.gb.granularity = 1
 		with write_access(m.reg2) as reg:
 			self.assertTrue(rec.empty())
@@ -296,7 +304,7 @@ class ContextManagerTest(BaseTestCase):
 
 	def test_context_mgr_write_only_sparse(self):
 		rec = self.rec
-		m = self.TestMap(self.cb, magic=False)
+		m = self.TestMap(self.cb, magic=True)
 		self.gb.granularity = 16
 		with write_access(m.reg32) as reg:
 			self.assertTrue(rec.empty())

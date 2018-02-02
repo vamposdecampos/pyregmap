@@ -26,6 +26,10 @@ class Magic(object):
 		return sub._set(value)
 	def __dir__(self):
 		return dir(self._reg)
+	def __enter__(self):
+		return self._reg.__enter__()
+	def __exit__(self, type, value, traceback):
+		return self._reg.__exit__(type, value, traceback)
 
 def named_int_factory(reg, base=int):
 	return type("enum.%s" % reg._name, (base,), dict(
@@ -111,25 +115,28 @@ class Register(object):
 					bit_length - last_rel))
 		self._bit_length = bit_length
 
-	def __call__(self, backend=None, bit_offset=0, magic=True, parent=None):
+	def __call__(self, backend=None, bit_offset=0, parent=None, magic=True, automagic=None):
 		"""Instantiate the register map"""
-		res = self.Instance(self, backend, bit_offset, parent)
-		return res._magic() if magic else res
+		if automagic is None:
+			automagic = magic
+		res = self.Instance(self, backend, bit_offset, parent, automagic=automagic)
+		return res._magic(True) if magic else res
 
 class RegisterInstance(object):
 	"""An instantiated register.  It has a backend and a well-defined bit position within it."""
-	def __init__(self, reg, backend, bit_offset, parent):
+	def __init__(self, reg, backend, bit_offset, parent, automagic=False):
 		self._reg = reg
 		self._backend = backend
 		self._bit_offset = bit_offset
 		self._defs = []
 		self._parent = parent
+		self._automagic = automagic
 		if parent:
 			self._long_name = '%s.%s' % (self._parent._long_name, self._name)
 		else:
 			self._long_name = self._name
 		for reg in self._reg._defs:
-			inst = reg(backend, bit_offset, magic=False, parent=self)
+			inst = reg(backend, bit_offset, magic=False, parent=self, automagic=self._automagic)
 			self._defs.append(inst)
 			assert not hasattr(self, reg._name), "sub-register %r already defined" % reg._name
 			setattr(self, reg._name, inst)
@@ -160,8 +167,10 @@ class RegisterInstance(object):
 	def _get(self):
 		value = self._backend.get_bits(self._bit_offset, self._bit_length)
 		return self._i2h(value)
-	def _magic(self):
-		return Magic(self)
+	def _magic(self, always=False):
+		if always or self._automagic:
+			return Magic(self)
+		return self
 	def _getall(self):
 		# TODO: caching, etc.
 		if len(self._defs):
@@ -263,6 +272,8 @@ class Backend(object):
 class rmw_access(object):
 	mode = Backend.MODE_RMW
 	def __init__(self, reg):
+		if isinstance(reg, Magic):
+			reg = reg._reg
 		self.reg = reg
 	def __enter__(self):
 		self.reg._backend.begin_update(self.reg._bit_offset, self.reg._bit_length, self.mode)
