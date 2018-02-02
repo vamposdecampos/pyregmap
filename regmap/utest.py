@@ -129,6 +129,18 @@ class RegisterMapTest(BaseTestCase):
 		m.reg2.flag2 = 'yes'
 		self.assertEqual(m.reg2._reg._get(), 4)
 
+	def test_no_magic(self):
+		be = IntBackend()
+		m = self.TestMap(be, magic=False)
+		self.assertEqual(m.reg1.field1(), 0)
+		m.reg2.flag2(1)
+		self.assertEquals(be.value, 0x4000)
+		self.assertEqual(m.reg2(), 4)
+		m.reg2.flag2('no')
+		self.assertEqual(m.reg2(), 0)
+		m.reg2.flag2('yes')
+		self.assertEqual(m.reg2(), 4)
+
 	def test_nested(self):
 		be = IntBackend()
 		n = Register("nested", defs = [

@@ -144,6 +144,12 @@ class RegisterInstance(object):
 	def _name(self):
 		return self._reg._name
 
+	def __call__(self, value=None):
+		"_set() if called with an argument, _get() otherwise"
+		if value is None:
+			return self._get()
+		return self._set(value)
+
 	def _set(self, value):
 		if type(value) != int:
 			value = self._h2i(value)
